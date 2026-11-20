@@ -1,0 +1,14 @@
+{{define "title"}}Log in · privnet{{end}}
+{{define "content"}}{{with .Page}}
+<div class="auth card">
+  <h1>Welcome back</h1>
+  {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+  <form method="post" action="/login" class="stack">
+    <input type="hidden" name="next" value="{{.Next}}">
+    <label>Email<input type="email" name="email" value="{{.Email}}" required autofocus autocomplete="email"></label>
+    <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+    <button class="btn btn-block">Log in</button>
+  </form>
+  {{if not .Closed}}<p class="muted center">No account yet? <a href="/signup">Create one</a></p>{{end}}
+</div>
+{{end}}{{end}}

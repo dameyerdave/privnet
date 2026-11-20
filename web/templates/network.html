@@ -1,0 +1,97 @@
+{{define "title"}}{{.Page.Network.Name}} · privnet{{end}}
+{{define "content"}}{{with .Page}}
+<nav class="crumbs"><a href="/networks">Networks</a> / <span>{{.Network.Name}}</span></nav>
+<div class="page-head">
+  <div>
+    <h1>{{.Network.Name}}</h1>
+    <p class="muted">Interface <code>{{.Iface}}</code> · {{len .Devices}} of {{.Network.MaxClients}} devices · hub endpoint <code>{{.Endpoint}}</code></p>
+  </div>
+</div>
+
+<div class="cols">
+  <section class="card">
+    <h2>Address plan</h2>
+    <dl class="kv">
+      <dt>Subnet</dt><dd><code>{{.Plan.Subnet}}</code></dd>
+      <dt>Gateway (hub)</dt><dd><code>{{.Plan.Gateway}}</code> <span class="muted small">{{.Gateway}}</span></dd>
+      <dt>Device range</dt><dd><code>{{.Plan.FirstHost}}</code> – <code>{{.Plan.LastHost}}</code></dd>
+      <dt>Free slots</dt><dd>{{.Free}}</dd>
+    </dl>
+    <div class="slots">
+      <div class="slot slot-gw" title="Gateway"><code>{{.Plan.Gateway}}</code><span>hub</span></div>
+      {{range .Slots}}
+        {{if .Device}}
+          <a class="slot slot-used" href="/devices/{{.Device.ID}}" title="{{.Device.Name}}"><code>{{.IP}}</code><span>{{.Device.Hostname}}</span></a>
+        {{else}}
+          <div class="slot"><code>{{.IP}}</code><span>free</span></div>
+        {{end}}
+      {{end}}
+    </div>
+  </section>
+
+  <section class="card" id="add">
+    <h2>Add a device</h2>
+    {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+    {{if .Free}}
+    <form method="post" action="/networks/{{.Network.ID}}/devices" class="stack">
+      <label>Device name
+        <input type="text" name="name" value="{{.FormName}}" maxlength="40" placeholder="e.g. anna-laptop" required>
+      </label>
+      <fieldset class="platforms">
+        <legend>Platform</legend>
+        {{$sel := .FormPlat}}
+        {{range .Platforms}}
+          <label class="chip"><input type="radio" name="platform" value="{{.Key}}" {{if eq .Key $sel}}checked{{end}}><span>{{.Label}}</span></label>
+        {{end}}
+      </fieldset>
+      <details class="advanced">
+        <summary>Advanced: use my own key pair</summary>
+        <p class="muted small">If you set a public key here, the private key never leaves your device. privnet won't be able to show a QR code, and the config will contain a placeholder where your private key goes.</p>
+        <label>WireGuard public key<input type="text" name="public_key" placeholder="output of: wg genkey | tee privatekey | wg pubkey" autocomplete="off" spellcheck="false"></label>
+      </details>
+      <button class="btn">Add device &amp; open guide</button>
+    </form>
+    {{else}}
+      <p class="muted">All {{.Network.MaxClients}} slots are in use. Remove a device to free a slot.</p>
+    {{end}}
+  </section>
+</div>
+
+<section class="card">
+  <div class="section-head">
+    <h2>Devices</h2>
+    <span class="muted small live-note">status refreshes every 5s</span>
+  </div>
+  {{if .Devices}}
+  <div class="table-wrap">
+  <table class="devices" data-status-url="/api/networks/{{.Network.ID}}/status">
+    <thead><tr><th>Device</th><th>Address</th><th>Platform</th><th>Status</th><th>Last handshake</th><th>Traffic ↓/↑</th><th></th></tr></thead>
+    <tbody>
+    {{range .Devices}}
+      <tr data-device="{{.ID}}">
+        <td><a href="/devices/{{.ID}}"><strong>{{.Name}}</strong></a><br><span class="muted small">{{.FQDN}}</span></td>
+        <td><code>{{.IP}}</code></td>
+        <td>{{.PlatformLabel}}</td>
+        <td><span class="pill {{if .Status.Online}}pill-ok{{end}}" data-field="pill"><span class="dot"></span><span data-field="state">{{if .Status.Online}}online{{else}}offline{{end}}</span></span></td>
+        <td data-field="hs">{{timeAgo .Status.LastHandshake}}</td>
+        <td data-field="traffic">{{bytes .Status.RxBytes}} / {{bytes .Status.TxBytes}}</td>
+        <td class="right"><a class="btn btn-sm btn-ghost" href="/devices/{{.ID}}">Guide &amp; QR</a></td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  {{else}}
+    <p class="muted">No devices yet. Add your first device above and you'll go straight to its setup guide.</p>
+  {{end}}
+</section>
+
+<section class="card danger" id="danger">
+  <h2>Delete network</h2>
+  <p class="muted">This disconnects all devices immediately and releases <code>{{.Network.Subnet}}</code>. To confirm, type <strong>{{.Network.Name}}</strong>.</p>
+  <form method="post" action="/networks/{{.Network.ID}}/delete" class="inline-form">
+    <input type="text" name="confirm" placeholder="{{.Network.Name}}" required autocomplete="off">
+    <button class="btn btn-danger">Delete network</button>
+  </form>
+</section>
+{{end}}{{end}}

@@ -1,0 +1,6 @@
+/privnet
+*.db
+*.db-shm
+*.db-wal
+deploy/k8s/secret.env
+.DS_Store

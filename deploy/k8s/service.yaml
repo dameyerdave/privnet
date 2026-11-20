@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: privnet-web
+  labels:
+    app.kubernetes.io/name: privnet
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: privnet
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+# Public UDP entry point for WireGuard. Cloudflare tunnels cannot carry UDP,
+# so this gets its own OpenStack (Octavia) load balancer with a public IP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: privnet-wg
+  labels:
+    app.kubernetes.io/name: privnet
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: privnet
+  ports:
+    - name: wireguard
+      port: 51820
+      targetPort: 51820
+      protocol: UDP

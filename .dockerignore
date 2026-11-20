@@ -1,0 +1,4 @@
+.git
+*.db*
+deploy
+README.md

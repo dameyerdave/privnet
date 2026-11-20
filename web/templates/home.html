@@ -1,0 +1,40 @@
+{{define "title"}}privnet · private WireGuard networks{{end}}
+{{define "content"}}{{with .Page}}
+<section class="hero">
+  <p class="eyebrow">WireGuard, managed</p>
+  <h1>Your devices, one private network.<br>Set up in minutes.</h1>
+  <p class="lead">Create a private network for {{.MinClients}}–{{.MaxClients}} devices. privnet handles the IP plan, keys and the WireGuard hub. Every device gets a step-by-step guide with its real values, plus a QR code.</p>
+  <div class="hero-cta">
+    {{if .Signup}}<a class="btn" href="/signup">Create your network</a>{{end}}
+    <a class="btn btn-ghost" href="/login">Log in</a>
+  </div>
+</section>
+<section class="features">
+  <div class="card feature">
+    <div class="feature-num">1</div>
+    <h3>Pick a size</h3>
+    <p>Choose how many devices will join. privnet reserves the smallest matching subnet, for example <code>/29</code> for 4–5 devices or <code>/27</code> for 16, and assigns every address.</p>
+  </div>
+  <div class="card feature">
+    <div class="feature-num">2</div>
+    <h3>Add devices</h3>
+    <p>Name a device and choose its platform. Keys, IPs and the config are generated, and the guide has commands ready to copy and paste.</p>
+  </div>
+  <div class="card feature">
+    <div class="feature-num">3</div>
+    <h3>Scan &amp; connect</h3>
+    <p>Phones scan a QR code. Laptops and servers import a file or run a single command. Send a time-limited link to people setting up their own device.</p>
+  </div>
+</section>
+<section class="card how">
+  <h2>How it works</h2>
+  <div class="diagram" aria-hidden="true">
+    <div class="node">laptop<br><code>.2</code></div>
+    <div class="edge"></div>
+    <div class="node hub">privnet hub<br><code>.1</code></div>
+    <div class="edge"></div>
+    <div class="node">phone<br><code>.3</code></div>
+  </div>
+  <p class="muted">Each device opens an encrypted WireGuard tunnel to the hub, and the hub forwards traffic between devices of the <em>same</em> network only. Networks are isolated from each other and from the hosting cluster, and your internet traffic is never routed through privnet.</p>
+</section>
+{{end}}{{end}}

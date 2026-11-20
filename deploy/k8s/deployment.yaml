@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: privnet
+  labels:
+    app.kubernetes.io/name: privnet
+spec:
+  replicas: 1 # single hub: owns wg0 and the SQLite volume
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: privnet
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: privnet
+    spec:
+      terminationGracePeriodSeconds: 10
+      initContainers:
+        # IP forwarding is needed so the hub can relay between peers. It is set
+        # in the pod's own network namespace only, not on the node.
+        - name: sysctl
+          image: privnet
+          command: ["sh", "-c", "sysctl -w net.ipv4.ip_forward=1"]
+          securityContext:
+            privileged: true
+      containers:
+        - name: privnet
+          image: privnet
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: wireguard
+              containerPort: 51820
+              protocol: UDP
+          envFrom:
+            - configMapRef:
+                name: privnet-config
+            - secretRef:
+                name: privnet-secret
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [NET_ADMIN, NET_RAW]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { memory: 256Mi }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: privnet-data

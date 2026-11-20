@@ -1,0 +1,18 @@
+# Web UI: Cloudflare (TLS, *.kizy.ch tunnel) -> Traefik -> privnet-web
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: privnet
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: privnet.kizy.ch
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: privnet-web
+                port:
+                  name: http

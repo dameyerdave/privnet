@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: privnet
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: privnet
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+configMapGenerator:
+  - name: privnet-config
+    envs: [config.env]
+secretGenerator:
+  # deploy/k8s/secret.env is created by deploy/deploy.sh and never committed.
+  - name: privnet-secret
+    envs: [secret.env]
+images:
+  - name: privnet
+    newName: harbor.kizy.ch/privnet/privnet
+    newTag: latest

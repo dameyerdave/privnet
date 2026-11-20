@@ -1,0 +1,9 @@
+{{define "title"}}{{.Page.Title}} · privnet{{end}}
+{{define "content"}}{{with .Page}}
+<div class="auth card center">
+  <p class="eyebrow">{{.Code}}</p>
+  <h1>{{.Title}}</h1>
+  <p class="muted">{{.Message}}</p>
+  <a class="btn" href="/">Go home</a>
+</div>
+{{end}}{{end}}
