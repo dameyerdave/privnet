@@ -9,7 +9,9 @@ You create a network, pick how many devices it should hold (4–16), and add dev
 - authorises each device on the WireGuard hub immediately,
 - shows a **QR code** for phones and a **step-by-step setup guide** for Linux, macOS, Windows, iOS and Android, with the device's real values (interface name, IPs, endpoint, keys, ping commands for every peer, hosts-file entries),
 - creates **time-limited share links** so someone else can onboard their own device without an account,
-- shows live online status, last handshake and traffic per device.
+- shows live online status, last handshake and traffic per device,
+- runs a **private-IP DNS service** (like nip.io) under `ip.kizy.ch` with per-owner namespaces, so
+  you can get **trusted Let's Encrypt certificates** for private IPs via DNS-01.
 
 Live at **https://privnet.kizy.ch**. The WireGuard hub listens on **83.228.201.62:51820/udp**.
 
@@ -20,6 +22,7 @@ Live at **https://privnet.kizy.ch**. The WireGuard hub listens on **83.228.201.6
  browser ──────────▶ Cloudflare ─▶ cloudflared ─▶ Traefik ─▶ privnet-web ┐
                                                                          │  one pod
  wg clients ═══════▶ OpenStack LB 83.228.201.62 ─▶ privnet-wg ──────────▶┤  (Go binary)
+ resolvers  ───────▶ OpenStack LB 179.237.118.172:53 ─▶ privnet-dns ─────▶┤  DNS :5353
                                                                          │  wg0 + iptables
                                                                          └─ SQLite on PVC
 ```
@@ -57,6 +60,41 @@ Only the number of slots you choose can be assigned. Client configs use
 * Bring-your-own-key: add a device with your own public key and the private key never leaves
   the device.
 
+## Private-IP DNS and certificates
+
+privnet is the authoritative nameserver for `DNS_ZONE` (`ip.kizy.ch`). Every name looks like
+`<host>.<namespace>.ip.kizy.ch`:
+
+| Name | Resolves to |
+|---|---|
+| `192-168-1-10.home.ip.kizy.ch` | `192.168.1.10` |
+| `app-192-168-1-10.home.ip.kizy.ch` | `192.168.1.10` (covered by the `*.home…` wildcard) |
+| `app.192-168-1-10.home.ip.kizy.ch`, `192.168.1.10.home.ip.kizy.ch` | `192.168.1.10` |
+| `nas.home.ip.kizy.ch` | custom record set in the UI |
+| `anna-laptop.home-lab-x7k2.ip.kizy.ch` | privnet device IP (each network gets a namespace) |
+
+* **Namespaces are owned.** Plain nip.io can't safely issue certificates, because anyone could get
+  one for `192-168-1-10.nip.io`. Here only the namespace owner can answer DNS-01 challenges for
+  `*.home.ip.kizy.ch`, so a wildcard cert covers every name in the namespace.
+* **Only private ranges** (10/8, 172.16/12, 192.168/16, 100.64/10, 127/8) are answered. No recursion,
+  ANY is minimised (RFC 8482), CAA at the apex allows only Let's Encrypt.
+* Names inside an existing namespace return NODATA instead of NXDOMAIN, so resolvers implementing
+  RFC 8020 (such as Let's Encrypt's Unbound) never hide `_acme-challenge` names.
+* **ACME API:** `POST /acme-dns/update` is compatible with acme-dns
+  (`X-Api-User`, `X-Api-Key`, `{"subdomain": "<namespace>", "txt": "…"}`), so lego, Traefik,
+  cert-manager, acme.sh and Caddy work unchanged. The UI has a recipe per client with the
+  namespace's real values. The 5 newest challenge values are kept for 24 h.
+
+### Delegation (one-time, in Cloudflare)
+
+| Type | Name | Content | Proxy |
+|---|---|---|---|
+| A | `privnet-ns.kizy.ch` | `179.237.118.172` (Service `privnet-dns`) | DNS only |
+| NS | `ip.kizy.ch` | `privnet-ns.kizy.ch` | – |
+
+Let's Encrypt limits are per registered domain (`kizy.ch`), and all namespaces share them.
+For heavy use, run the zone on a dedicated domain and add it to the Public Suffix List.
+
 ## Configuration
 
 | Variable | Default | Meaning |
@@ -71,6 +109,10 @@ Only the number of slots you choose can be assigned. Client configs use
 | `SHARE_TTL` | `72h` | Lifetime of onboarding links |
 | `DB_PATH` | `privnet.db` | SQLite file |
 | `WG_MODE` | `kernel` | `fake` for UI development without WireGuard (e.g. macOS) |
+| `DNS_ZONE` | – | Zone served by the DNS service, e.g. `ip.kizy.ch` (empty = disabled) |
+| `DNS_NAMESERVER` / `DNS_PUBLIC_IP` | – | NS hostname delegated to, and its public IP |
+| `DNS_LISTEN` | `:5353` | DNS listen address (UDP+TCP) |
+| `MAX_DNS_ZONES_PER_USER` / `MAX_DNS_RECORDS_PER_ZONE` | `3` / `64` | Limits |
 
 The MTU is 1380 because the pod's eth0 has MTU 1450 (Cilium overlay) and WireGuard adds up to 80 bytes.
 
