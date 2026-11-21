@@ -88,7 +88,7 @@ APP_SECRET=devsecretdevsecret WG_ENDPOINT=203.0.113.1:51820 WG_MODE=fake go run 
 deploy/deploy.sh
 ```
 
-The script builds a `linux/amd64` image tagged with the git SHA, pushes it to Harbor, creates
+The script builds a `linux/amd64` image tagged with the git SHA, pushes it to Docker Hub (`docker.io/dameyerdave/privnet`), creates
 `APP_SECRET` once (and reuses the one in the cluster after that), waits for the load balancer IP,
 writes it into `WG_ENDPOINT`, and applies `deploy/k8s` with kustomize.
 

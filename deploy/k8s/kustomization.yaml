@@ -19,5 +19,5 @@ secretGenerator:
     envs: [secret.env]
 images:
   - name: privnet
-    newName: harbor.kizy.ch/privnet/privnet
-    newTag: latest
+    newName: docker.io/dameyerdave/privnet
+    newTag: 07d7f9c

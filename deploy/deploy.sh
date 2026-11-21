@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 KUBE_CONTEXT=${KUBE_CONTEXT:-xuno-admin@xuno}
 NAMESPACE=${NAMESPACE:-privnet}
-IMAGE_REPO=${IMAGE_REPO:-harbor.kizy.ch/privnet/privnet}
+IMAGE_REPO=${IMAGE_REPO:-docker.io/dameyerdave/privnet}
 TAG=${TAG:-$(git rev-parse --short HEAD)$(git diff --quiet || echo -dirty)}
 K="kubectl --context $KUBE_CONTEXT -n $NAMESPACE"
 DIR=deploy/k8s
