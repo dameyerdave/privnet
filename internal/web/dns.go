@@ -307,7 +307,7 @@ func (s *Server) handleCreateDNSZone(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/dns/%d", z.ID), http.StatusSeeOther)
+	redirectDone(w, r, fmt.Sprintf("/dns/%d", z.ID), "zone-created")
 }
 
 func (s *Server) ownedZone(r *http.Request) (*store.DNSZone, error) {
@@ -483,7 +483,7 @@ func (s *Server) handleCreateDNSRecord(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/dns/%d#names", z.ID), http.StatusSeeOther)
+	redirectDone(w, r, fmt.Sprintf("/dns/%d#names", z.ID), "record-added")
 }
 
 func (s *Server) handleDeleteDNSRecord(w http.ResponseWriter, r *http.Request) {
@@ -503,7 +503,7 @@ func (s *Server) handleDeleteDNSRecord(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/dns/%d#names", z.ID), http.StatusSeeOther)
+	redirectDone(w, r, fmt.Sprintf("/dns/%d#names", z.ID), "record-removed")
 }
 
 func (s *Server) handleRotateDNSKey(w http.ResponseWriter, r *http.Request) {
@@ -543,7 +543,7 @@ func (s *Server) handleDeleteDNSZone(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, "/dns", http.StatusSeeOther)
+	redirectDone(w, r, "/dns", "zone-deleted")
 }
 
 // ---- acme-dns compatible API ----

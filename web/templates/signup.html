@@ -2,16 +2,17 @@
 {{define "content"}}{{with .Page}}
 <div class="auth card">
   <h1>Create your account</h1>
+  <p class="muted">Free. Your first private network takes about two minutes.</p>
   {{if .Closed}}
     <div class="alert">Sign-up is currently disabled on this instance.</div>
   {{else}}
-    {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+    {{if .Error}}<div class="alert alert-error" role="alert">{{.Error}}</div>{{end}}
     <form method="post" action="/signup" class="stack">
       <label>Email<input type="email" name="email" value="{{.Email}}" required autofocus autocomplete="email"></label>
-      <label>Password<input type="password" name="password" minlength="10" required autocomplete="new-password">
-        <small class="muted">At least 10 characters.</small></label>
+      <label>Password<span class="pw-field"><input type="password" name="password" minlength="10" required autocomplete="new-password" aria-describedby="pw-help"><button type="button" class="pw-toggle" data-pw-toggle aria-label="Show password">Show</button></span>
+        <small class="muted" id="pw-help">At least 10 characters. A passphrase of a few words works well.</small></label>
       {{if .NeedCode}}<label>Invite code<input type="text" name="code" required></label>{{end}}
-      <button class="btn btn-block">Create account</button>
+      <button class="btn btn-block" data-busy="Creating account…">Create account</button>
     </form>
   {{end}}
   <p class="muted center">Already registered? <a href="/login">Log in</a></p>

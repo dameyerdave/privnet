@@ -1,42 +1,52 @@
 {{define "title"}}{{.Page.Network.Name}} · privnet{{end}}
 {{define "content"}}{{with .Page}}
-<nav class="crumbs"><a href="/networks">Networks</a> / <span>{{.Network.Name}}</span></nav>
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/networks">Networks</a> <span aria-hidden="true">/</span> <span aria-current="page">{{.Network.Name}}</span></nav>
 <div class="page-head">
   <div>
     <h1>{{.Network.Name}}</h1>
-    <p class="muted">Interface <code>{{.Iface}}</code> · {{len .Devices}} of {{.Network.MaxClients}} devices · hub endpoint <code>{{.Endpoint}}</code></p>
+    <p class="muted page-meta">
+      <span class="pill {{if .Online}}pill-ok{{end}}" data-online-pill><span class="dot"></span><span><span data-online-count>{{.Online}}</span> online</span></span>
+      <span>{{len .Devices}} of {{.Network.MaxClients}} devices</span>
+      <span><code>{{.Network.Subnet}}</code></span>
+    </p>
   </div>
+  {{if and .Free .Devices}}<a class="btn" href="#add" data-open="#add" data-focus="#device-name">+ Add device</a>{{end}}
 </div>
 
-<div class="cols">
-  <section class="card">
-    <h2>Address plan</h2>
-    <dl class="kv">
-      <dt>Subnet</dt><dd><code>{{.Plan.Subnet}}</code></dd>
-      <dt>Gateway (hub)</dt><dd><code>{{.Plan.Gateway}}</code> <span class="muted small">{{.Gateway}}</span></dd>
-      <dt>Device range</dt><dd><code>{{.Plan.FirstHost}}</code> – <code>{{.Plan.LastHost}}</code></dd>
-      <dt>Free slots</dt><dd>{{.Free}}</dd>
-      {{if .DNSDomain}}<dt>DNS names</dt><dd><code>*.{{.DNSDomain}}</code> <a class="small" href="/dns/{{.DNSZoneID}}">DNS &amp; certificates →</a></dd>{{end}}
-    </dl>
-    <div class="slots">
-      <div class="slot slot-gw" title="Gateway"><code>{{.Plan.Gateway}}</code><span>hub</span></div>
-      {{range .Slots}}
-        {{if .Device}}
-          <a class="slot slot-used" href="/devices/{{.Device.ID}}" title="{{.Device.Name}}"><code>{{.IP}}</code><span>{{.Device.Hostname}}</span></a>
-        {{else}}
-          <div class="slot"><code>{{.IP}}</code><span>free</span></div>
-        {{end}}
-      {{end}}
-    </div>
-  </section>
+{{if .Devices}}
+<section class="card" aria-labelledby="devices-h">
+  <div class="section-head">
+    <h2 id="devices-h">Devices</h2>
+    <span class="muted small live-note"><span class="live-dot" aria-hidden="true"></span>Live status</span>
+  </div>
+  <table class="devices responsive" data-status-url="/api/networks/{{.Network.ID}}/status">
+    <thead><tr><th scope="col">Device</th><th scope="col">Address</th><th scope="col">Status</th><th scope="col">Last handshake</th><th scope="col">Traffic ↓ / ↑</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+    <tbody>
+    {{range .Devices}}
+      <tr data-device="{{.ID}}">
+        <td data-label="Device"><a href="/devices/{{.ID}}" class="dev-link"><strong>{{.Name}}</strong></a><span class="muted small dev-sub">{{.PlatformLabel}} · {{.FQDN}}</span></td>
+        <td data-label="Address"><code>{{.IP}}</code></td>
+        <td data-label="Status"><span class="pill {{if .Status.Online}}pill-ok{{end}}" data-field="pill"><span class="dot"></span><span data-field="state">{{if .Status.Online}}online{{else}}offline{{end}}</span></span></td>
+        <td data-label="Last handshake" data-field="hs">{{timeAgo .Status.LastHandshake}}</td>
+        <td data-label="Traffic ↓ / ↑" data-field="traffic">{{bytes .Status.RxBytes}} / {{bytes .Status.TxBytes}}</td>
+        <td class="right row-action"><a class="btn btn-sm btn-ghost" href="/devices/{{.ID}}">Setup &amp; QR<span class="sr-only"> for {{.Name}}</span></a></td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+</section>
+{{end}}
 
-  <section class="card" id="add">
-    <h2>Add a device</h2>
-    {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+<div class="cols">
+  <section class="card" id="add" aria-labelledby="add-h">
+    <h2 id="add-h">{{if .Devices}}Add a device{{else}}Add your first device{{end}}</h2>
+    {{if .Error}}<div class="alert alert-error" role="alert">{{.Error}}</div>{{end}}
     {{if .Free}}
+    <p class="muted small">You'll get a QR code, a config file and a step-by-step guide right away. {{.Free}} of {{.Network.MaxClients}} slots free.</p>
     <form method="post" action="/networks/{{.Network.ID}}/devices" class="stack">
       <label>Device name
-        <input type="text" name="name" value="{{.FormName}}" maxlength="40" placeholder="e.g. anna-laptop" required>
+        <input type="text" id="device-name" name="name" value="{{.FormName}}" maxlength="40" placeholder="e.g. anna-laptop" required autocomplete="off" {{if or (not .Devices) .Error}}autofocus{{end}}>
+        <small class="muted">Also becomes its DNS name, so short names work best.</small>
       </label>
       <fieldset class="platforms">
         <legend>Platform</legend>
@@ -50,49 +60,42 @@
         <p class="muted small">If you set a public key here, the private key never leaves your device. privnet won't be able to show a QR code, and the config will contain a placeholder where your private key goes.</p>
         <label>WireGuard public key<input type="text" name="public_key" placeholder="output of: wg genkey | tee privatekey | wg pubkey" autocomplete="off" spellcheck="false"></label>
       </details>
-      <button class="btn">Add device &amp; open guide</button>
+      <div><button class="btn" data-busy="Adding…">Add device &amp; open guide</button></div>
     </form>
     {{else}}
       <p class="muted">All {{.Network.MaxClients}} slots are in use. Remove a device to free a slot.</p>
     {{end}}
   </section>
+
+  <section class="card" aria-labelledby="plan-h">
+    <h2 id="plan-h">Address plan</h2>
+    <div class="slots" role="list">
+      <div class="slot slot-gw" role="listitem"><code>{{.Plan.Gateway}}</code><span>privnet hub</span></div>
+      {{range .Slots}}
+        {{if .Device}}
+          <a class="slot slot-used" role="listitem" href="/devices/{{.Device.ID}}"><code>{{.IP}}</code><span>{{.Device.Name}}</span></a>
+        {{else}}
+          <div class="slot" role="listitem"><code>{{.IP}}</code><span>free</span></div>
+        {{end}}
+      {{end}}
+    </div>
+    <dl class="kv kv-compact">
+      <dt>Subnet</dt><dd><code>{{.Plan.Subnet}}</code></dd>
+      <dt>Gateway</dt><dd><code>{{.Plan.Gateway}}</code> <span class="muted small">{{.Gateway}}</span></dd>
+      <dt>Hub endpoint</dt><dd><code>{{.Endpoint}}</code> <span class="muted small">UDP</span></dd>
+      <dt>Interface</dt><dd><code>{{.Iface}}</code></dd>
+      {{if .DNSDomain}}<dt>DNS names</dt><dd><code>*.{{.DNSDomain}}</code><br><a class="small" href="/dns/{{.DNSZoneID}}">DNS names &amp; certificates →</a></dd>{{end}}
+    </dl>
+  </section>
 </div>
 
-<section class="card">
-  <div class="section-head">
-    <h2>Devices</h2>
-    <span class="muted small live-note">status refreshes every 5s</span>
-  </div>
-  {{if .Devices}}
-  <div class="table-wrap">
-  <table class="devices" data-status-url="/api/networks/{{.Network.ID}}/status">
-    <thead><tr><th>Device</th><th>Address</th><th>Platform</th><th>Status</th><th>Last handshake</th><th>Traffic ↓/↑</th><th></th></tr></thead>
-    <tbody>
-    {{range .Devices}}
-      <tr data-device="{{.ID}}">
-        <td><a href="/devices/{{.ID}}"><strong>{{.Name}}</strong></a><br><span class="muted small">{{.FQDN}}</span></td>
-        <td><code>{{.IP}}</code></td>
-        <td>{{.PlatformLabel}}</td>
-        <td><span class="pill {{if .Status.Online}}pill-ok{{end}}" data-field="pill"><span class="dot"></span><span data-field="state">{{if .Status.Online}}online{{else}}offline{{end}}</span></span></td>
-        <td data-field="hs">{{timeAgo .Status.LastHandshake}}</td>
-        <td data-field="traffic">{{bytes .Status.RxBytes}} / {{bytes .Status.TxBytes}}</td>
-        <td class="right"><a class="btn btn-sm btn-ghost" href="/devices/{{.ID}}">Guide &amp; QR</a></td>
-      </tr>
-    {{end}}
-    </tbody>
-  </table>
-  </div>
-  {{else}}
-    <p class="muted">No devices yet. Add your first device above and you'll go straight to its setup guide.</p>
-  {{end}}
-</section>
-
-<section class="card danger" id="danger">
-  <h2>Delete network</h2>
-  <p class="muted">This disconnects all devices immediately and releases <code>{{.Network.Subnet}}</code>. To confirm, type <strong>{{.Network.Name}}</strong>.</p>
-  <form method="post" action="/networks/{{.Network.ID}}/delete" class="inline-form">
-    <input type="text" name="confirm" placeholder="{{.Network.Name}}" required autocomplete="off">
-    <button class="btn btn-danger">Delete network</button>
+<details class="card accordion danger" id="danger">
+  <summary><span class="acc-title"><h2>Danger zone</h2><span class="muted small">Delete this network</span></span></summary>
+  <p>This disconnects all {{len .Devices}} devices immediately and releases <code>{{.Network.Subnet}}</code>. It can't be undone. To confirm, type <strong>{{.Network.Name}}</strong>.</p>
+  <form method="post" action="/networks/{{.Network.ID}}/delete" class="inline-form" data-confirm-match="{{.Network.Name}}">
+    <label class="sr-only" for="confirm-net">Network name</label>
+    <input type="text" id="confirm-net" name="confirm" placeholder="{{.Network.Name}}" required autocomplete="off" spellcheck="false">
+    <button class="btn btn-danger" data-busy="Deleting…">Delete network</button>
   </form>
-</section>
+</details>
 {{end}}{{end}}

@@ -403,7 +403,7 @@ func (s *Server) handleDeleteCert(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/devices/%d#https", d.ID), http.StatusSeeOther)
+	redirectDone(w, r, fmt.Sprintf("/devices/%d#https", d.ID), "cert-removed")
 }
 
 func (s *Server) handleRetryCert(w http.ResponseWriter, r *http.Request) {
@@ -432,7 +432,7 @@ func (s *Server) handleRotateCertToken(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/devices/%d#cert-%d", d.ID, c.ID), http.StatusSeeOther)
+	redirectDone(w, r, fmt.Sprintf("/devices/%d#cert-%d", d.ID, c.ID), "token-rotated")
 }
 
 // writeCertFile serves fullchain.pem, cert.pem, chain.pem or privkey.pem of a

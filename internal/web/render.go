@@ -65,10 +65,50 @@ func (s *Server) loadTemplates(assets fs.FS) error {
 }
 
 type layoutData struct {
-	DNS   bool
-	User  any
-	Title string
-	Page  any
+	DNS     bool
+	User    any
+	Title   string
+	Page    any
+	Section string // networks | dns | "" — highlights the current nav item
+	Flash   string // confirmation after a redirect (?done=…)
+}
+
+// flashMessages are the confirmations a redirect can request with ?done=<key>.
+// Only known keys are shown, so the URL can't inject text.
+var flashMessages = map[string]string{
+	"net-created":    "Network created. Add your first device to get its setup guide and QR code.",
+	"net-deleted":    "Network deleted. All its devices were disconnected.",
+	"device-removed": "Device removed. Its key no longer works on the hub.",
+	"share-revoked":  "Share link revoked.",
+	"cert-removed":   "HTTPS name removed.",
+	"token-rotated":  "New download token created. Update the URLs on the device.",
+	"zone-created":   "Namespace created. Its names resolve right away.",
+	"zone-deleted":   "Namespace deleted.",
+	"record-added":   "Name added. It resolves within a few seconds.",
+	"record-removed": "Name removed.",
+}
+
+// redirectDone redirects to target and asks the next page to confirm an action.
+func redirectDone(w http.ResponseWriter, r *http.Request, target, key string) {
+	frag := ""
+	if i := strings.IndexByte(target, '#'); i >= 0 {
+		target, frag = target[:i], target[i:]
+	}
+	sep := "?"
+	if strings.Contains(target, "?") {
+		sep = "&"
+	}
+	http.Redirect(w, r, target+sep+"done="+key+frag, http.StatusSeeOther)
+}
+
+func sectionOf(path string) string {
+	switch {
+	case strings.HasPrefix(path, "/networks"), strings.HasPrefix(path, "/devices"):
+		return "networks"
+	case strings.HasPrefix(path, "/dns"):
+		return "dns"
+	}
+	return ""
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data any) {
@@ -80,7 +120,8 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 	} else if u := s.loadUser(r); u != nil {
 		user = u
 	}
-	if err := t.ExecuteTemplate(&buf, "layout", layoutData{DNS: s.cfg.DNS.Enabled(), User: user, Page: data}); err != nil {
+	if err := t.ExecuteTemplate(&buf, "layout", layoutData{DNS: s.cfg.DNS.Enabled(), User: user, Page: data,
+		Section: sectionOf(r.URL.Path), Flash: flashMessages[r.URL.Query().Get("done")]}); err != nil {
 		slog.Error("render", "page", name, "err", err)
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return

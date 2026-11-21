@@ -266,7 +266,7 @@ func (s *Server) handleCreateNetwork(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/networks/%d", n.ID), http.StatusSeeOther)
+	redirectDone(w, r, fmt.Sprintf("/networks/%d#add", n.ID), "net-created")
 }
 
 type deviceRow struct {
@@ -296,6 +296,7 @@ type networkPage struct {
 	Gateway   string
 	DNSZoneID int64
 	DNSDomain string
+	Online    int
 }
 
 func (s *Server) networkPageData(r *http.Request, n *store.Network) (*networkPage, error) {
@@ -317,6 +318,9 @@ func (s *Server) networkPageData(r *http.Request, n *store.Network) (*networkPag
 	for _, d := range devs {
 		row := deviceRow{Device: d, FQDN: cookbook.FQDN(d.Hostname, domain), PlatformLabel: cookbook.PlatformLabel(d.Platform), Status: status[d.PublicKey]}
 		p.Devices = append(p.Devices, row)
+		if row.Status.Online() {
+			p.Online++
+		}
 	}
 	for i := range p.Devices {
 		byIP[p.Devices[i].IP] = &p.Devices[i]
@@ -364,7 +368,7 @@ func (s *Server) handleDeleteNetwork(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, "/networks", http.StatusSeeOther)
+	redirectDone(w, r, "/networks", "net-deleted")
 }
 
 type statusRow struct {
@@ -620,7 +624,7 @@ func (s *Server) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/networks/%d", n.ID), http.StatusSeeOther)
+	redirectDone(w, r, fmt.Sprintf("/networks/%d", n.ID), "device-removed")
 }
 
 // ---- sharing ----
@@ -654,7 +658,7 @@ func (s *Server) handleRevokeShare(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/devices/%d#share", d.ID), http.StatusSeeOther)
+	redirectDone(w, r, fmt.Sprintf("/devices/%d#share", d.ID), "share-revoked")
 }
 
 func (s *Server) shareLookup(r *http.Request) (*store.Share, *store.Device, *store.Network, error) {

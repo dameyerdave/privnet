@@ -1,6 +1,6 @@
 {{define "title"}}{{.Page.Z.Label}} · DNS · privnet{{end}}
 {{define "content"}}{{with .Page}}
-<nav class="crumbs"><a href="/dns">DNS</a> / <span>{{.Z.Label}}</span></nav>
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/dns">DNS</a> <span aria-hidden="true">/</span> <span aria-current="page">{{.Z.Label}}</span></nav>
 <div class="page-head">
   <div>
     <h1><code class="h1-code">{{.Domain}}</code></h1>
@@ -11,7 +11,7 @@
 <div class="cols">
   <section class="card" id="names">
     <h2>Names</h2>
-    {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+    {{if .Error}}<div class="alert alert-error" role="alert">{{.Error}}</div>{{end}}
     {{if .Hosts}}
     <div class="table-wrap">
     <table class="mini">
@@ -28,9 +28,9 @@
     {{end}}
     {{if .CanAdd}}
     <form method="post" action="/dns/{{.Z.ID}}/records" class="record-form">
-      <div class="suffix-input"><input type="text" name="name" value="{{.FormName}}" placeholder="nas" required autocomplete="off" spellcheck="false"><span>.{{.Domain}}</span></div>
-      <input type="text" name="ip" value="{{.FormIP}}" placeholder="192.168.1.20" required autocomplete="off" spellcheck="false">
-      <button class="btn">Add name</button>
+      <div class="suffix-input"><input type="text" name="name" value="{{.FormName}}" placeholder="nas" required autocomplete="off" spellcheck="false" aria-label="Name"><span>.{{.Domain}}</span></div>
+      <input type="text" name="ip" value="{{.FormIP}}" placeholder="192.168.1.20" required autocomplete="off" spellcheck="false" inputmode="decimal" aria-label="Private IPv4 address">
+      <button class="btn" data-busy="Adding…">Add name</button>
     </form>
     {{end}}
     <details class="accordion accordion-inline">
@@ -99,13 +99,14 @@
 </details>
 
 {{if not .Network}}
-<section class="card danger" id="danger">
-  <h2>Delete namespace</h2>
-  <p class="muted">All names stop resolving immediately and the credentials stop working. Certificates you already have stay valid until they expire. To confirm, type <strong>{{.Z.Label}}</strong>.</p>
-  <form method="post" action="/dns/{{.Z.ID}}/delete" class="inline-form">
-    <input type="text" name="confirm" placeholder="{{.Z.Label}}" required autocomplete="off">
-    <button class="btn btn-danger">Delete namespace</button>
+<details class="card accordion danger" id="danger">
+  <summary><span class="acc-title"><h2>Danger zone</h2><span class="muted small">Delete this namespace</span></span></summary>
+  <p>All names stop resolving immediately and the credentials stop working. Certificates you already have stay valid until they expire. To confirm, type <strong>{{.Z.Label}}</strong>.</p>
+  <form method="post" action="/dns/{{.Z.ID}}/delete" class="inline-form" data-confirm-match="{{.Z.Label}}">
+    <label class="sr-only" for="confirm-zone">Namespace</label>
+    <input type="text" id="confirm-zone" name="confirm" placeholder="{{.Z.Label}}" required autocomplete="off" spellcheck="false">
+    <button class="btn btn-danger" data-busy="Deleting…">Delete namespace</button>
   </form>
-</section>
+</details>
 {{end}}
 {{end}}{{end}}

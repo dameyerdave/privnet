@@ -6,23 +6,27 @@
     This link expires in {{until .ExpiresAt}}. Don't forward it: it contains the device's private key.
   </div>
 {{else}}
-  <nav class="crumbs"><a href="/networks">Networks</a> / <a href="/networks/{{$cb.Network.ID}}">{{$cb.Network.Name}}</a> / <span>{{$cb.Device.Name}}</span></nav>
-  {{if .IsNew}}<div class="alert alert-ok">Device created and authorised on the hub. Follow the guide below to connect it.</div>{{end}}
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="/networks">Networks</a> <span aria-hidden="true">/</span> <a href="/networks/{{$cb.Network.ID}}">{{$cb.Network.Name}}</a> <span aria-hidden="true">/</span> <span aria-current="page">{{$cb.Device.Name}}</span></nav>
+  {{if .IsNew}}<div class="alert alert-ok" role="status">Device created and authorized on the hub. Now connect it: scan the QR code on a phone, or follow the setup guide below.</div>{{end}}
 {{end}}
 
 <div class="page-head">
   <div>
     <h1>{{$cb.Device.Name}}</h1>
-    <p class="muted"><code>{{$cb.Device.IP}}</code> in <strong>{{$cb.Network.Name}}</strong> (<code>{{$cb.Network.Subnet}}</code>) · {{platformLabel $cb.Device.Platform}}</p>
+    <p class="muted page-meta"><span>{{platformLabel $cb.Device.Platform}}</span><span><code>{{$cb.Device.IP}}</code></span><span>in <strong>{{$cb.Network.Name}}</strong></span></p>
   </div>
-  <span class="pill pill-lg {{if .Status.Online}}pill-ok{{end}}"><span class="dot"></span>{{if .Status.Online}}connected · {{timeAgo .Status.LastHandshake}}{{else}}not connected yet{{end}}</span>
+  <span class="pill pill-lg {{if .Status.Online}}pill-ok{{end}}" {{if not .Join}}data-device-status="/api/networks/{{$cb.Network.ID}}/status" data-device-id="{{$cb.Device.ID}}"{{end}} role="status" aria-live="polite">
+    <span class="dot"></span><span data-device-state>{{if .Status.Online}}connected · {{timeAgo .Status.LastHandshake}}{{else}}not connected yet{{end}}</span>
+  </span>
 </div>
+<div class="alert alert-ok" role="status" data-connected-banner hidden><strong>{{$cb.Device.Name}} is connected.</strong> It completed its first handshake with the hub and can now reach the other devices in {{$cb.Network.Name}}.</div>
 
 <div class="cols cols-qr">
-  <section class="card qr-card">
+  <section class="card qr-card" aria-labelledby="connect-h">
+    <h2 id="connect-h" class="sr-only">Connect</h2>
     {{if $cb.HasKey}}
       <img class="qr" src="{{.QRURL}}" alt="WireGuard configuration QR code for {{$cb.Device.Name}}" width="280" height="280">
-      <p class="small muted center">Scan with the WireGuard app: <strong>+</strong> → <em>Create from QR code</em> (iOS) or <em>Scan from QR code</em> (Android).</p>
+      <p class="small muted center">On a phone: in the WireGuard app tap <strong>+</strong>, then <em>Create from QR code</em> (iOS) or <em>Scan from QR code</em> (Android).</p>
     {{else}}
       <div class="qr-missing">
         <strong>No QR code</strong>
@@ -31,28 +35,64 @@
     {{end}}
     <div class="btn-row">
       <a class="btn" href="{{.ConfigURL}}" download="{{$cb.ConfFile}}">Download {{$cb.ConfFile}}</a>
-      <button class="btn btn-ghost" data-copy="#config-text">Copy config</button>
+      <button type="button" class="btn btn-ghost" data-copy="#config-text">Copy config</button>
     </div>
+    <p class="small muted center qr-hint">On a laptop or server? <a href="#guide" data-open="#guide">Open the setup guide</a></p>
   </section>
 
-  <section class="card">
-    <h2>At a glance</h2>
+  <div class="col-stack">
+  <section class="card" aria-labelledby="glance-h">
+    <h2 id="glance-h">At a glance</h2>
     <dl class="kv">
-      <dt>Tunnel / interface</dt><dd><code>{{$cb.Iface}}</code></dd>
-      <dt>Device address</dt><dd><code>{{$cb.Device.IP}}/32</code></dd>
-      <dt>Hostname</dt><dd><code>{{$cb.FQDN}}</code></dd>
-      <dt>Network</dt><dd><code>{{$cb.Network.Subnet}}</code></dd>
-      <dt>Gateway</dt><dd><code>{{$cb.Plan.Gateway}}</code></dd>
+      <dt>Address</dt><dd><code>{{$cb.Device.IP}}</code></dd>
+      <dt>DNS name</dt><dd><code>{{$cb.FQDN}}</code></dd>
+      <dt>Network</dt><dd><code>{{$cb.Network.Subnet}}</code> <span class="muted small">via gateway <code>{{$cb.Plan.Gateway}}</code></span></dd>
       <dt>Hub endpoint</dt><dd><code>{{$cb.Settings.Endpoint}}</code> <span class="muted small">UDP</span></dd>
-      <dt>Hub public key</dt><dd><code class="key">{{$cb.Settings.ServerPublicKey}}</code></dd>
-      <dt>Device public key</dt><dd><code class="key">{{$cb.Device.PublicKey}}</code></dd>
-      <dt>MTU / keepalive</dt><dd><code>{{$cb.Settings.MTU}}</code> / <code>{{$cb.Settings.Keepalive}}s</code></dd>
+      {{if .Status.Online}}<dt>Traffic</dt><dd>{{bytes .Status.RxBytes}} received · {{bytes .Status.TxBytes}} sent</dd>{{end}}
     </dl>
+    <details class="config-details">
+      <summary>Technical details</summary>
+      <dl class="kv">
+        <dt>Interface</dt><dd><code>{{$cb.Iface}}</code></dd>
+        <dt>Hub public key</dt><dd><code class="key">{{$cb.Settings.ServerPublicKey}}</code></dd>
+        <dt>Device public key</dt><dd><code class="key">{{$cb.Device.PublicKey}}</code></dd>
+        <dt>MTU / keepalive</dt><dd><code>{{$cb.Settings.MTU}}</code> / <code>{{$cb.Settings.Keepalive}}s</code></dd>
+      </dl>
+    </details>
     <details class="config-details">
       <summary>Show full configuration</summary>
       <pre class="code" id="config-text">{{$cb.Config}}</pre>
     </details>
   </section>
+  {{if not .Join}}
+<section class="card" id="share">
+  <h2>Share onboarding</h2>
+  <p class="muted">Setting this up for someone else? Create a private link that opens this guide, QR code and config download with no login needed. Each link works for {{.ShareTTL}} and can be revoked at any time.</p>
+  {{if .NewShareURL}}
+    <div class="share-new">
+      <img src="{{qrDataURI .NewShareURL}}" alt="QR code of the share link" width="160" height="160">
+      <div class="share-new-body">
+        <strong>New link created.</strong> Copy it now. For security it is only shown once.
+        <div class="copy-field"><input type="text" readonly value="{{.NewShareURL}}" id="share-url"><button class="btn btn-sm" data-copy="#share-url">Copy</button></div>
+        <p class="small muted">Tip: scanning this QR with a phone's <em>camera</em> opens the guide on the phone. From there, “Download {{$cb.ConfFile}}” imports straight into the WireGuard app.</p>
+      </div>
+    </div>
+  {{end}}
+  <form method="post" action="/devices/{{$cb.Device.ID}}/shares"><button class="btn btn-ghost" data-busy="Creating…">{{if .Shares}}Create another link{{else}}Create share link{{end}}</button></form>
+  {{if .Shares}}
+    <table class="mini">
+      <thead><tr><th>Created</th><th>Expires</th><th></th></tr></thead>
+      <tbody>
+      {{range .Shares}}
+        <tr><td>{{date .CreatedAt}}</td><td>in {{until .ExpiresAt}}</td>
+          <td class="right"><form method="post" action="/devices/{{$cb.Device.ID}}/shares/{{.ID}}/revoke"><button class="btn btn-sm btn-ghost">Revoke</button></form></td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  {{end}}
+</section>
+  {{end}}
+  </div>
 </div>
 
 <details class="card cookbook accordion" id="guide" {{if or .IsNew .Join}}open{{end}}>
@@ -78,7 +118,7 @@
     <span class="muted small">Optional: trusted Let's Encrypt certificates for this device.</span>
   </div>
   {{if .Staging}}<div class="alert alert-info">This server uses the Let's Encrypt <strong>staging</strong> CA. Browsers won't trust these certificates.</div>{{end}}
-  {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+  {{if .Error}}<div class="alert alert-error" role="alert">{{.Error}}</div>{{end}}
 
   {{range .Certs}}
   <div class="cert" id="cert-{{.ID}}">
@@ -91,7 +131,11 @@
       {{else if eq .Status "pending"}}<span class="pill"><span class="dot"></span>issuing…</span>
       {{else}}<span class="pill pill-err"><span class="dot"></span>failed</span>{{end}}
     </div>
-    {{if .LastError}}<div class="alert alert-error small">{{if eq .Status "issued"}}The last renewal attempt failed (the current certificate keeps working): {{end}}{{.LastError}}</div>{{end}}
+    {{if .LastError}}<div class="alert alert-error small" role="alert">
+      <strong>{{if eq .Status "issued"}}The last automatic renewal failed.{{else}}Let's Encrypt couldn't issue this certificate.{{end}}</strong>
+      {{if eq .Status "issued"}}The current certificate keeps working, and privnet retries every few hours.{{else}}Try again in a moment. If it keeps failing, remove the name and pick another one.{{end}}
+      <details class="err-details"><summary>Technical details</summary><code>{{.LastError}}</code></details>
+    </div>{{end}}
 
     {{if eq .Status "issued"}}
       {{if eq .Mode "proxy"}}
@@ -184,7 +228,7 @@ sudo chmod +x /etc/cron.daily/privnet-tls-{{.Name}}</pre>
         <span><strong>Download the certificate</strong><br>
         <span class="small muted">The name points to this device (<code>{{.DeviceIP}}</code>). You install the certificate and key in your own web server. privnet renews it, and the device pulls the new files with a token URL.</span></span></label>
     </fieldset>
-    <div><button class="btn">Create certificate</button></div>
+    <div><button class="btn" data-busy="Requesting…">Create certificate</button></div>
     <p class="small muted">Certificate names are published in public Certificate Transparency logs. The addresses behind them stay private.</p>
   </form>
   </details>
@@ -194,40 +238,15 @@ sudo chmod +x /etc/cron.daily/privnet-tls-{{.Name}}</pre>
 </section>
 {{end}}{{end}}
 
-{{if not .Join}}
-<section class="card" id="share">
-  <h2>Share onboarding</h2>
-  <p class="muted">Setting this up for someone else? Create a private link that opens this guide, QR code and config download with no login needed. Each link works for {{.ShareTTL}} and can be revoked at any time.</p>
-  {{if .NewShareURL}}
-    <div class="share-new">
-      <img src="{{qrDataURI .NewShareURL}}" alt="QR code of the share link" width="160" height="160">
-      <div class="share-new-body">
-        <strong>New link created.</strong> Copy it now. For security it is only shown once.
-        <div class="copy-field"><input type="text" readonly value="{{.NewShareURL}}" id="share-url"><button class="btn btn-sm" data-copy="#share-url">Copy</button></div>
-        <p class="small muted">Tip: scanning this QR with a phone's <em>camera</em> opens the guide on the phone. From there, “Download {{$cb.ConfFile}}” imports straight into the WireGuard app.</p>
-      </div>
-    </div>
-  {{end}}
-  <form method="post" action="/devices/{{$cb.Device.ID}}/shares"><button class="btn btn-ghost">Create share link</button></form>
-  {{if .Shares}}
-    <table class="mini">
-      <thead><tr><th>Created</th><th>Expires</th><th></th></tr></thead>
-      <tbody>
-      {{range .Shares}}
-        <tr><td>{{date .CreatedAt}}</td><td>in {{until .ExpiresAt}}</td>
-          <td class="right"><form method="post" action="/devices/{{$cb.Device.ID}}/shares/{{.ID}}/revoke"><button class="btn btn-sm btn-ghost">Revoke</button></form></td></tr>
-      {{end}}
-      </tbody>
-    </table>
-  {{end}}
-</section>
 
-<section class="card danger">
-  <h2>Remove device</h2>
-  <p class="muted">This revokes the device's key on the hub immediately and frees <code>{{$cb.Device.IP}}</code>. Any share links stop working.</p>
-  <form method="post" action="/devices/{{$cb.Device.ID}}/delete" data-confirm="Remove {{$cb.Device.Name}} from {{$cb.Network.Name}}?">
-    <button class="btn btn-danger">Remove {{$cb.Device.Name}}</button>
+
+{{if not .Join}}
+<details class="card accordion danger" id="danger">
+  <summary><span class="acc-title"><h2>Danger zone</h2><span class="muted small">Remove this device</span></span></summary>
+  <p>This revokes the device's key on the hub immediately and frees <code>{{$cb.Device.IP}}</code>. Its HTTPS names and share links stop working. It can't be undone.</p>
+  <form method="post" action="/devices/{{$cb.Device.ID}}/delete" data-confirm="Remove {{$cb.Device.Name}} from {{$cb.Network.Name}}? This can't be undone.">
+    <button class="btn btn-danger" data-busy="Removing…">Remove {{$cb.Device.Name}}</button>
   </form>
-</section>
+</details>
 {{end}}
 {{end}}{{end}}
