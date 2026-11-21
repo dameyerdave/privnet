@@ -20,4 +20,4 @@ secretGenerator:
 images:
   - name: privnet
     newName: docker.io/dameyerdave/privnet
-    newTag: 09c3909
+    newTag: 834ce59

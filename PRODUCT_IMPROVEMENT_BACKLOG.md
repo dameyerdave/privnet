@@ -237,7 +237,6 @@ The commits are local only (`9a08170`, `109effc` and the session-close commit). 
 | UX-008 | Resizing a network needs a migration path: a new subnet, re-addressing devices and re-distributing configs. That breaks connected devices unless done carefully. | IPAM changes; a per-device "config changed" notice | 4 | Design "grow network" that allocates a larger block and shows every device a "download new config" prompt |
 | UX-009 | Password reset needs outbound email (SMTP or provider) and token flows; no mail infrastructure exists | Mail service, secret management | 4 | Decide on a mail provider first. Meanwhile the account page gives signed-in users self-service. |
 | ARCH-001 | Fine for the current single-replica deployment | Shared store (SQLite table or Redis) | 3 | Only needed if privnet ever runs more than one replica |
-| Deploy | Session rules forbid pushing or deploying without explicit authorization | Owner approval | 1 | Owner reviews the local commits, then `git push` and `deploy/deploy.sh` |
 
 ## G. Session History
 
@@ -263,12 +262,21 @@ The commits are local only (`9a08170`, `109effc` and the session-close commit). 
   - invalid `listitem` roles on links;
   - an empty table header.
 - **Recommended next priorities:** see H.
+- **Deployment (2026-11-21, after owner approval):** pushed and deployed. Verified in production:
+  - `Strict-Transport-Security: max-age=31536000` is present;
+  - `/nope` returns 404 with the "Page not found" page;
+  - `/account` redirects to login when signed out;
+  - the 11th failed login for one account returns 429 (tested with a non-existent probe account);
+  - sign-up with a 100-character password returns 400;
+  - new CSS is served (hashed URL);
+  - DNS answers;
+  - no errors in the pod log.
 
 ## H. Next Eight-Hour Session Plan
 
 Start by reading this file. Then run `tests/e2e/run-local.sh` and both journey scripts to confirm there are no regressions from session 1.
 
-1. **Deploy check (with owner approval):** verify HSTS, the lockout and the new pages in production. Recheck the scorecard against production headers.
+1. **Production follow-up:** session 1 is deployed and its server-side checks were verified. Re-run the browser journeys against a staging copy with real WireGuard if one becomes available.
 2. **UX-012:** for connected devices, lead with status and actions (HTTPS, share, rename) and move the QR code and config into a collapsible "Connect another time" panel. Validate J11 and J2.
 3. **A11Y-005:** fix the reading order on phones so the setup guide comes before share onboarding (reorder the markup with CSS grid areas).
 4. **UX-008:** design and implement "grow network" (bigger block, devices prompted to re-download configs). Needs careful IPAM tests.
