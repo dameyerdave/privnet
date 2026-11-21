@@ -2,7 +2,9 @@ package web
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -19,8 +21,26 @@ import (
 
 var pageNames = []string{"home", "login", "signup", "networks", "network", "device", "status", "dns", "dnszone"}
 
+// assetVersion hashes the static files so their URLs change on every deploy
+// that changes them (CDNs such as Cloudflare cache /static for hours).
+func assetVersion(assets fs.FS) string {
+	h := sha256.New()
+	_ = fs.WalkDir(assets, "static", func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			if b, err := fs.ReadFile(assets, p); err == nil {
+				h.Write([]byte(p))
+				h.Write(b)
+			}
+		}
+		return nil
+	})
+	return hex.EncodeToString(h.Sum(nil))[:12]
+}
+
 func (s *Server) loadTemplates(assets fs.FS) error {
+	ver := assetVersion(assets)
 	funcs := template.FuncMap{
+		"asset":         func(p string) string { return "/static/" + p + "?v=" + ver },
 		"timeAgo":       timeAgo,
 		"bytes":         humanBytes,
 		"platformLabel": cookbook.PlatformLabel,
