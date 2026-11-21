@@ -36,9 +36,9 @@ chmod 600 acme-dns.json</pre>
     <pre class="code">docker run --rm -v "$PWD:/data" -w /data \
   -e ACME_DNS_API_BASE={{.APIBase}} \
   -e ACME_DNS_STORAGE_PATH=/data/acme-dns.json \
-  goacme/lego --accept-tos --email you@example.com --path /data/lego \
-  --dns acme-dns -d '{{.Domain}}' -d '*.{{.Domain}}' run</pre>
-    <p class="small muted">Replace the email address with yours. Add <code>--server https://acme-staging-v02.api.letsencrypt.org/directory</code> for a dry run against staging first.</p>
+  goacme/lego --accept-tos --email YOUR_EMAIL --path /data/lego \
+  --dns acme-dns --dns.resolvers 1.1.1.1:53 -d '{{.Domain}}' -d '*.{{.Domain}}' run</pre>
+    <p class="small muted">Replace <code>YOUR_EMAIL</code> with a real address (Let's Encrypt rejects example domains). <code>--dns.resolvers</code> makes lego check propagation against a public resolver, which avoids timeouts on Docker's built-in DNS. Add <code>--server https://acme-staging-v02.api.letsencrypt.org/directory</code> for a dry run against staging first.</p>
   </li>
   <li>
     <h4>Use it</h4>
@@ -48,8 +48,8 @@ chmod 600 acme-dns.json</pre>
     <h4>Renew (cron, daily)</h4>
     <pre class="code">docker run --rm -v "$HOME/privnet-certs:/data" -w /data \
   -e ACME_DNS_API_BASE={{.APIBase}} -e ACME_DNS_STORAGE_PATH=/data/acme-dns.json \
-  goacme/lego --accept-tos --email you@example.com --path /data/lego \
-  --dns acme-dns -d '{{.Domain}}' -d '*.{{.Domain}}' renew --days 30</pre>
+  goacme/lego --accept-tos --email YOUR_EMAIL --path /data/lego \
+  --dns acme-dns --dns.resolvers 1.1.1.1:53 -d '{{.Domain}}' -d '*.{{.Domain}}' renew --days 30</pre>
   </li>
 </ol>
 {{end}}
@@ -76,7 +76,7 @@ sudo chmod 700 /etc/letsencrypt/privnet-{{.Z.Label}}-auth.sh</pre>
     <pre class="code">sudo certbot certonly --manual --preferred-challenges dns \
   --manual-auth-hook /etc/letsencrypt/privnet-{{.Z.Label}}-auth.sh \
   --cert-name {{.Domain}} -d '{{.Domain}}' -d '*.{{.Domain}}' \
-  --agree-tos -m you@example.com --no-eff-email</pre>
+  --agree-tos -m YOUR_EMAIL --no-eff-email</pre>
   </li>
   <li>
     <h4>Use it</h4>
@@ -124,7 +124,7 @@ chmod 600 acme-dns.json</pre>
     command:
       - --entrypoints.websecure.address=:443
       - --providers.docker=true
-      - --certificatesresolvers.privnet.acme.email=you@example.com
+      - --certificatesresolvers.privnet.acme.email=YOUR_EMAIL
       - --certificatesresolvers.privnet.acme.storage=/data/acme.json
       - --certificatesresolvers.privnet.acme.dnschallenge.provider=acme-dns
     environment:
@@ -163,7 +163,7 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: you@example.com
+    email: YOUR_EMAIL
     privateKeySecretRef:
       name: privnet-{{.Z.Label}}-account
     solvers:
