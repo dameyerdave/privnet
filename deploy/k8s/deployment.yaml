@@ -35,6 +35,12 @@ spec:
             - name: wireguard
               containerPort: 51820
               protocol: UDP
+            - name: dns-udp
+              containerPort: 5353
+              protocol: UDP
+            - name: dns-tcp
+              containerPort: 5353
+              protocol: TCP
           envFrom:
             - configMapRef:
                 name: privnet-config

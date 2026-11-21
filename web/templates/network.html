@@ -16,6 +16,7 @@
       <dt>Gateway (hub)</dt><dd><code>{{.Plan.Gateway}}</code> <span class="muted small">{{.Gateway}}</span></dd>
       <dt>Device range</dt><dd><code>{{.Plan.FirstHost}}</code> – <code>{{.Plan.LastHost}}</code></dd>
       <dt>Free slots</dt><dd>{{.Free}}</dd>
+      {{if .DNSDomain}}<dt>DNS names</dt><dd><code>*.{{.DNSDomain}}</code> <a class="small" href="/dns/{{.DNSZoneID}}">DNS &amp; certificates →</a></dd>{{end}}
     </dl>
     <div class="slots">
       <div class="slot slot-gw" title="Gateway"><code>{{.Plan.Gateway}}</code><span>hub</span></div>

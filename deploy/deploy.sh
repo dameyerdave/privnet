@@ -45,6 +45,14 @@ done
 port=$($K get svc privnet-wg -o jsonpath='{.spec.ports[0].port}')
 sed -i.bak "s|^WG_ENDPOINT=.*|WG_ENDPOINT=$ip:$port|" $DIR/config.env && rm -f $DIR/config.env.bak
 echo "    endpoint: $ip:$port/udp"
+for i in $(seq 1 60); do
+  dnsip=$($K get svc privnet-dns -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  [[ -n "$dnsip" ]] && break
+  sleep 5
+done
+[[ -n "$dnsip" ]] || { echo "DNS load balancer has no external IP yet" >&2; exit 1; }
+sed -i.bak "s|^DNS_PUBLIC_IP=.*|DNS_PUBLIC_IP=$dnsip|" $DIR/config.env && rm -f $DIR/config.env.bak
+echo "    dns: $dnsip:53 (udp+tcp)"
 
 sed -i.bak -E "s|^(    newName: ).*|\1$IMAGE_REPO|; s|^(    newTag: ).*|\1$TAG|" $DIR/kustomization.yaml && rm -f $DIR/kustomization.yaml.bak
 

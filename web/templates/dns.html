@@ -1,0 +1,50 @@
+{{define "title"}}DNS &amp; certificates · privnet{{end}}
+{{define "content"}}{{with .Page}}
+<div class="page-head">
+  <div>
+    <h1>DNS &amp; certificates</h1>
+    <p class="muted">Public DNS names that point to private IPs, like nip.io but in a namespace only you control. That means you can get trusted Let's Encrypt certificates for them with DNS-01.</p>
+  </div>
+</div>
+
+{{if .Zones}}
+<div class="grid-cards">
+  {{range .Zones}}
+  <a class="card net-card" href="/dns/{{.ID}}">
+    <div class="net-card-head">
+      <h3>{{.Label}}</h3>
+      {{if .Network}}<span class="pill">network</span>{{else}}<span class="pill">standalone</span>{{end}}
+    </div>
+    <code class="net-cidr">*.{{.Domain}}</code>
+    <p class="muted small">{{if .Network}}Device names of <strong>{{.Network.Name}}</strong>{{else}}Any private IP{{end}} · {{.Records}} custom record{{if ne .Records 1}}s{{end}}</p>
+  </a>
+  {{end}}
+</div>
+{{end}}
+
+<section class="card" id="create">
+  <h2>Create a namespace</h2>
+  <p class="muted">Use this for your LAN or homelab, or for anything outside privnet. Every privnet network already gets its own namespace automatically.</p>
+  {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+  {{if .CanCreate}}
+  <form method="post" action="/dns" class="create-net">
+    <label>Namespace
+      <div class="suffix-input"><input type="text" name="label" value="{{.FormLabel}}" placeholder="{{.Suggestion}}" pattern="[a-z0-9][a-z0-9-]{1,30}[a-z0-9]" required autocomplete="off" spellcheck="false"><span>.{{.Zone}}</span></div>
+      <small class="muted">3–32 lowercase letters, digits or dashes. Everyone can see this name in certificate logs, so don't use personal data.</small>
+    </label>
+    <button class="btn">Create namespace</button>
+  </form>
+  {{else}}
+    <p class="muted">You have reached the limit of {{.Max}} standalone namespaces.</p>
+  {{end}}
+</section>
+
+<section class="card">
+  <h2>How it works</h2>
+  <ol class="steps">
+    <li><h4>Names resolve to private IPs</h4><p><code>192-168-1-10.<em>yourname</em>.{{.Zone}}</code> resolves to <code>192.168.1.10</code> from anywhere, with no setup. You can also add your own names, like <code>nas.<em>yourname</em>.{{.Zone}}</code>. Only private ranges are ever answered.</p></li>
+    <li><h4>Only you can prove ownership</h4><p>Each namespace has its own API credentials. Your ACME client uses them to publish the DNS-01 challenge, so nobody else can get a certificate for your names.</p></li>
+    <li><h4>One wildcard certificate covers everything</h4><p>Request <code>*.<em>yourname</em>.{{.Zone}}</code> once and it covers every IP and device name in the namespace. Ready-made recipes cover lego, certbot, acme.sh, Traefik, cert-manager and Caddy.</p></li>
+  </ol>
+</section>
+{{end}}{{end}}

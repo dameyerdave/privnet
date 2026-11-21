@@ -108,6 +108,29 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS dns_zones (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  label TEXT NOT NULL UNIQUE,
+  network_id INTEGER UNIQUE REFERENCES networks(id) ON DELETE CASCADE,
+  api_user TEXT NOT NULL UNIQUE,
+  api_key_enc TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL
+);
+CREATE TABLE IF NOT EXISTS dns_records (
+  id INTEGER PRIMARY KEY,
+  zone_id INTEGER NOT NULL REFERENCES dns_zones(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  ip TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  UNIQUE(zone_id, name)
+);
+CREATE TABLE IF NOT EXISTS dns_txt (
+  id INTEGER PRIMARY KEY,
+  zone_id INTEGER NOT NULL REFERENCES dns_zones(id) ON DELETE CASCADE,
+  value TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL
+);
 `
 
 // Open opens (and migrates) the database. secret is used to derive the key

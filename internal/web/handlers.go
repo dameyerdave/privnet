@@ -256,6 +256,12 @@ func (s *Server) handleCreateNetwork(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	if s.cfg.DNS.Enabled() {
+		if _, err := s.ensureNetworkZone(ctx, n); err != nil {
+			s.serverError(w, r, err)
+			return
+		}
+	}
 	if err := s.Sync(ctx); err != nil {
 		s.serverError(w, r, err)
 		return
@@ -288,6 +294,8 @@ type networkPage struct {
 	FormPlat  string
 	Endpoint  string
 	Gateway   string
+	DNSZoneID int64
+	DNSDomain string
 }
 
 func (s *Server) networkPageData(r *http.Request, n *store.Network) (*networkPage, error) {
@@ -297,11 +305,17 @@ func (s *Server) networkPageData(r *http.Request, n *store.Network) (*networkPag
 	}
 	status, _ := s.wg.Status()
 	plan := ipam.NewPlan(n.Subnet, n.MaxClients)
+	domain := cookbook.HostDomain(n.Slug, s.dnsDomain(r.Context(), n.ID))
 	p := &networkPage{Network: n, Plan: plan, Iface: cookbook.IfaceName(n.Slug), Platforms: cookbook.Platforms,
-		Endpoint: s.cfg.Settings.Endpoint, FormPlat: "linux", Gateway: cookbook.FQDN("gateway", n.Slug)}
+		Endpoint: s.cfg.Settings.Endpoint, FormPlat: "linux", Gateway: cookbook.FQDN("gateway", domain)}
+	if s.cfg.DNS.Enabled() {
+		if z, err := s.store.DNSZoneByNetwork(r.Context(), n.ID); err == nil {
+			p.DNSZoneID, p.DNSDomain = z.ID, domain
+		}
+	}
 	byIP := map[netip.Addr]*deviceRow{}
 	for _, d := range devs {
-		row := deviceRow{Device: d, FQDN: cookbook.FQDN(d.Hostname, n.Slug), PlatformLabel: cookbook.PlatformLabel(d.Platform), Status: status[d.PublicKey]}
+		row := deviceRow{Device: d, FQDN: cookbook.FQDN(d.Hostname, domain), PlatformLabel: cookbook.PlatformLabel(d.Platform), Status: status[d.PublicKey]}
 		p.Devices = append(p.Devices, row)
 	}
 	for i := range p.Devices {
@@ -481,7 +495,7 @@ func (s *Server) buildCookbook(r *http.Request, n *store.Network, d *store.Devic
 	if err != nil {
 		return nil, err
 	}
-	return cookbook.Build(n, devs, d, s.cfg.Settings), nil
+	return cookbook.Build(n, devs, d, s.cfg.Settings, s.dnsDomain(r.Context(), n.ID)), nil
 }
 
 type devicePage struct {

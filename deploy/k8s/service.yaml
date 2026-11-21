@@ -31,3 +31,24 @@ spec:
       port: 51820
       targetPort: 51820
       protocol: UDP
+---
+# Public authoritative DNS for the private-IP zone (DNS_ZONE), UDP and TCP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: privnet-dns
+  labels:
+    app.kubernetes.io/name: privnet
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: privnet
+  ports:
+    - name: dns-udp
+      port: 53
+      targetPort: 5353
+      protocol: UDP
+    - name: dns-tcp
+      port: 53
+      targetPort: 5353
+      protocol: TCP

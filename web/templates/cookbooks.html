@@ -27,10 +27,18 @@ ping -c 3 {{.CB.Plan.Gateway}}</pre>
 <table class="mini">
   <thead><tr><th>Device</th><th>Address</th><th>Hostname</th></tr></thead>
   <tbody>
-    <tr><td>privnet hub</td><td><code>{{.CB.Plan.Gateway}}</code></td><td><code>gateway.{{.CB.Network.Slug}}.privnet</code></td></tr>
+    <tr><td>privnet hub</td><td><code>{{.CB.Plan.Gateway}}</code></td><td><code>{{.CB.GatewayFQDN}}</code></td></tr>
     {{range .CB.Peers}}<tr{{if .Self}} class="self"{{end}}><td>{{.Name}}{{if .Self}} <span class="muted">(this device)</span>{{end}}</td><td><code>{{.IP}}</code></td><td><code>{{.FQDN}}</code></td></tr>{{end}}
   </tbody>
 </table>
+{{end}}
+
+{{define "cb-dns-names"}}
+<p>Every device already has a public DNS name that points to its private address, so no hosts file is needed:</p>
+<pre class="code">ping {{.CB.GatewayFQDN}}
+{{range .CB.Others}}ping {{.FQDN}}
+{{end}}</pre>
+<p class="small muted">If a name doesn't resolve, your router or resolver probably has DNS rebinding protection. Allow the domain <code>{{.CB.DNSDomain}}</code> there, or use the IPs.</p>
 {{end}}
 
 {{define "cb-expect"}}
@@ -83,10 +91,12 @@ ip addr show {{$cb.Iface}}    # should list inet {{$cb.Device.IP}}/32</pre>
     {{template "cb-peers-unix" .}}
   </li>
   <li>
-    <h4>Optional: use names instead of IPs</h4>
+    <h4>{{if $cb.DNSDomain}}Use names instead of IPs{{else}}Optional: use names instead of IPs{{end}}</h4>
+    {{if $cb.DNSDomain}}{{template "cb-dns-names" .}}{{else}}
     <pre class="code">sudo tee -a /etc/hosts &gt; /dev/null &lt;&lt;'EOF'
 {{$cb.HostsSnippet}}EOF</pre>
     <p class="small muted">After this, <code>ping {{$cb.FQDN}}</code> works. If devices are added later, refresh this page for the updated list.</p>
+    {{end}}
   </li>
   <li>
     <h4>Disconnect or uninstall</h4>
@@ -137,10 +147,12 @@ sudo wg show</pre>
     <p class="small muted">Disconnect with <code>sudo wg-quick down {{$cb.Iface}}</code>.</p>
   </li>
 </ol>
-<h3 class="variant">Optional: names instead of IPs</h3>
+<h3 class="variant">{{if $cb.DNSDomain}}Names instead of IPs{{else}}Optional: names instead of IPs{{end}}</h3>
+{{if $cb.DNSDomain}}{{template "cb-dns-names" .}}{{else}}
 <pre class="code">sudo tee -a /etc/hosts &gt; /dev/null &lt;&lt;'EOF'
 {{$cb.HostsSnippet}}EOF
 sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder</pre>
+{{end}}
 {{template "cb-peers-table" .}}
 {{end}}
 
@@ -179,11 +191,13 @@ ping -n 3 {{.IP}}
 {{end}}</pre>
   </li>
   <li>
-    <h4>Optional: names instead of IPs</h4>
+    <h4>{{if $cb.DNSDomain}}Names instead of IPs{{else}}Optional: names instead of IPs{{end}}</h4>
+    {{if $cb.DNSDomain}}{{template "cb-dns-names" .}}{{else}}
     <p>In an Administrator PowerShell:</p>
     <pre class="code">Add-Content -Path "$env:SystemRoot\System32\drivers\etc\hosts" -Value @"
 {{$cb.HostsSnippet}}"@
 ipconfig /flushdns</pre>
+    {{end}}
   </li>
 </ol>
 {{template "cb-peers-table" .}}

@@ -231,3 +231,17 @@ h3.variant:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
 .share-new-body { flex: 1 1 260px; min-width: 0; }
 .copy-field { display: flex; gap: 8px; margin: 10px 0; }
 .copy-field input { margin-top: 0; font-family: var(--mono); font-size: .82rem; }
+
+/* DNS */
+.suffix-input { display: flex; align-items: stretch; margin-top: 6px; min-width: 0; }
+.suffix-input input { margin-top: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; min-width: 0; flex: 1 1 120px; }
+.suffix-input span { display: flex; align-items: center; padding: 0 10px; background: var(--surface-2); border: 1px solid var(--border); border-left: 0; border-radius: 0 9px 9px 0; font: .85rem var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
+.record-form { display: grid; grid-template-columns: 1fr 150px auto; gap: 8px; margin-top: 14px; align-items: center; }
+.record-form .suffix-input { margin-top: 0; }
+.record-form > input { margin-top: 0; }
+@media (max-width: 620px) { .record-form { grid-template-columns: 1fr; } }
+.h1-code { font-size: inherit; background: none; padding: 0; word-break: break-all; }
+.txt-list { list-style: none; padding: 0; margin: 4px 0 14px; font-size: .85rem; }
+.txt-list li { margin-bottom: 4px; }
+ul.notes { padding-left: 18px; margin: 0; }
+ul.notes li { margin-bottom: 8px; }

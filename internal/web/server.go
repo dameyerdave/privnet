@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/dameyerdave/privnet/internal/cookbook"
+	pdns "github.com/dameyerdave/privnet/internal/dns"
 	"github.com/dameyerdave/privnet/internal/ipam"
 	"github.com/dameyerdave/privnet/internal/store"
 	"github.com/dameyerdave/privnet/internal/wg"
@@ -31,12 +32,14 @@ type Config struct {
 	SignupCode         string
 	MaxNetworksPerUser int
 	ShareTTL           time.Duration
+	DNS                DNSConfig
 }
 
 type Server struct {
 	cfg    Config
 	store  *store.Store
 	wg     wg.Manager
+	dns    *pdns.Server // nil when the DNS service is disabled
 	pages  map[string]*template.Template
 	static fs.FS
 	secure bool
@@ -48,8 +51,8 @@ type Server struct {
 
 const sessionCookie = "privnet_session"
 
-func New(cfg Config, st *store.Store, mgr wg.Manager, assets fs.FS) (*Server, error) {
-	s := &Server{cfg: cfg, store: st, wg: mgr, secure: strings.HasPrefix(cfg.BaseURL, "https://")}
+func New(cfg Config, st *store.Store, mgr wg.Manager, dnsSrv *pdns.Server, assets fs.FS) (*Server, error) {
+	s := &Server{cfg: cfg, store: st, wg: mgr, dns: dnsSrv, secure: strings.HasPrefix(cfg.BaseURL, "https://")}
 	if err := s.loadTemplates(assets); err != nil {
 		return nil, err
 	}
@@ -61,8 +64,11 @@ func New(cfg Config, st *store.Store, mgr wg.Manager, assets fs.FS) (*Server, er
 	return s, nil
 }
 
-// Sync pushes the complete desired state from the database to WireGuard.
+// Sync pushes the complete desired state from the database to WireGuard and DNS.
 func (s *Server) Sync(ctx context.Context) error {
+	if err := s.SyncDNS(ctx); err != nil {
+		return err
+	}
 	nets, err := s.store.AllNetworks(ctx)
 	if err != nil {
 		return err
@@ -106,6 +112,19 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /devices/{id}/delete", s.auth(s.handleDeleteDevice))
 	mux.HandleFunc("POST /devices/{id}/shares", s.auth(s.handleCreateShare))
 	mux.HandleFunc("POST /devices/{id}/shares/{sid}/revoke", s.auth(s.handleRevokeShare))
+
+	if s.cfg.DNS.Enabled() {
+		mux.HandleFunc("GET /dns", s.auth(s.handleDNSList))
+		mux.HandleFunc("POST /dns", s.auth(s.handleCreateDNSZone))
+		mux.HandleFunc("GET /dns/{id}", s.auth(s.handleDNSZone))
+		mux.HandleFunc("POST /dns/{id}/records", s.auth(s.handleCreateDNSRecord))
+		mux.HandleFunc("POST /dns/{id}/records/{rid}/delete", s.auth(s.handleDeleteDNSRecord))
+		mux.HandleFunc("POST /dns/{id}/rotate", s.auth(s.handleRotateDNSKey))
+		mux.HandleFunc("POST /dns/{id}/delete", s.auth(s.handleDeleteDNSZone))
+		mux.HandleFunc("POST /acme-dns/update", s.handleACMEUpdate)
+		mux.HandleFunc("POST /acme-dns/register", s.handleACMERegister)
+		mux.HandleFunc("GET /acme-dns/health", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	}
 
 	mux.HandleFunc("GET /join/{token}", s.handleJoin)
 	mux.HandleFunc("GET /join/{token}/config", s.handleJoinConfig)

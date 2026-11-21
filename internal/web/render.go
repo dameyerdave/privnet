@@ -17,7 +17,7 @@ import (
 	"github.com/dameyerdave/privnet/internal/cookbook"
 )
 
-var pageNames = []string{"home", "login", "signup", "networks", "network", "device", "status"}
+var pageNames = []string{"home", "login", "signup", "networks", "network", "device", "status", "dns", "dnszone"}
 
 func (s *Server) loadTemplates(assets fs.FS) error {
 	funcs := template.FuncMap{
@@ -35,7 +35,7 @@ func (s *Server) loadTemplates(assets fs.FS) error {
 	s.pages = map[string]*template.Template{}
 	for _, name := range pageNames {
 		t, err := template.New(name).Funcs(funcs).ParseFS(assets,
-			"templates/layout.html", "templates/cookbooks.html", path.Join("templates", name+".html"))
+			"templates/layout.html", "templates/cookbooks.html", "templates/acme.html", path.Join("templates", name+".html"))
 		if err != nil {
 			return fmt.Errorf("template %s: %w", name, err)
 		}
@@ -45,6 +45,7 @@ func (s *Server) loadTemplates(assets fs.FS) error {
 }
 
 type layoutData struct {
+	DNS   bool
 	User  any
 	Title string
 	Page  any
@@ -59,7 +60,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 	} else if u := s.loadUser(r); u != nil {
 		user = u
 	}
-	if err := t.ExecuteTemplate(&buf, "layout", layoutData{User: user, Page: data}); err != nil {
+	if err := t.ExecuteTemplate(&buf, "layout", layoutData{DNS: s.cfg.DNS.Enabled(), User: user, Page: data}); err != nil {
 		slog.Error("render", "page", name, "err", err)
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return

@@ -1,0 +1,230 @@
+{{/*
+  ACME DNS-01 cookbooks. Context: web.zonePage
+  .Domain  = <label>.<zone>   .Z.APIUser / .Z.APIKey / .Z.Label   .APIBase
+*/}}
+
+{{define "acme-account-json"}}{
+  "{{.Domain}}": {
+    "username": "{{.Z.APIUser}}",
+    "password": "{{.Z.APIKey}}",
+    "fulldomain": "_acme-challenge.{{.Domain}}",
+    "subdomain": "{{.Z.Label}}",
+    "allowfrom": []
+  },
+  "*.{{.Domain}}": {
+    "username": "{{.Z.APIUser}}",
+    "password": "{{.Z.APIKey}}",
+    "fulldomain": "_acme-challenge.{{.Domain}}",
+    "subdomain": "{{.Z.Label}}",
+    "allowfrom": []
+  }
+}{{end}}
+
+{{define "acme-lego"}}
+<p>The simplest option: <a href="https://go-acme.github.io/lego/">lego</a> is a single binary, also available as a Docker image.</p>
+<ol class="steps">
+  <li>
+    <h4>Save the account file</h4>
+    <pre class="code">mkdir -p ~/privnet-certs &amp;&amp; cd ~/privnet-certs
+cat &gt; acme-dns.json &lt;&lt;'EOF'
+{{template "acme-account-json" .}}
+EOF
+chmod 600 acme-dns.json</pre>
+  </li>
+  <li>
+    <h4>Request the certificate</h4>
+    <pre class="code">docker run --rm -v "$PWD:/data" -w /data \
+  -e ACME_DNS_API_BASE={{.APIBase}} \
+  -e ACME_DNS_STORAGE_PATH=/data/acme-dns.json \
+  goacme/lego --accept-tos --email you@example.com --path /data/lego \
+  --dns acme-dns -d '{{.Domain}}' -d '*.{{.Domain}}' run</pre>
+    <p class="small muted">Replace the email address with yours. Add <code>--server https://acme-staging-v02.api.letsencrypt.org/directory</code> for a dry run against staging first.</p>
+  </li>
+  <li>
+    <h4>Use it</h4>
+    <p>Certificate and key: <code>~/privnet-certs/lego/certificates/_.{{.Domain}}.crt</code> and <code>_.{{.Domain}}.key</code>.</p>
+  </li>
+  <li>
+    <h4>Renew (cron, daily)</h4>
+    <pre class="code">docker run --rm -v "$HOME/privnet-certs:/data" -w /data \
+  -e ACME_DNS_API_BASE={{.APIBase}} -e ACME_DNS_STORAGE_PATH=/data/acme-dns.json \
+  goacme/lego --accept-tos --email you@example.com --path /data/lego \
+  --dns acme-dns -d '{{.Domain}}' -d '*.{{.Domain}}' renew --days 30</pre>
+  </li>
+</ol>
+{{end}}
+
+{{define "acme-certbot"}}
+<p>certbot doesn't need a plugin here. A small hook script publishes the challenge through the privnet API.</p>
+<ol class="steps">
+  <li>
+    <h4>Install the hook</h4>
+    <pre class="code">sudo tee /etc/letsencrypt/privnet-{{.Z.Label}}-auth.sh &gt; /dev/null &lt;&lt;'EOF'
+#!/bin/sh
+# privnet DNS-01 hook for {{.Domain}}
+curl -fsS -X POST {{.APIBase}}/update \
+  -H 'X-Api-User: {{.Z.APIUser}}' \
+  -H 'X-Api-Key: {{.Z.APIKey}}' \
+  -H 'Content-Type: application/json' \
+  -d "{\"subdomain\": \"{{.Z.Label}}\", \"txt\": \"$CERTBOT_VALIDATION\"}" &gt; /dev/null
+sleep 5
+EOF
+sudo chmod 700 /etc/letsencrypt/privnet-{{.Z.Label}}-auth.sh</pre>
+  </li>
+  <li>
+    <h4>Request the certificate</h4>
+    <pre class="code">sudo certbot certonly --manual --preferred-challenges dns \
+  --manual-auth-hook /etc/letsencrypt/privnet-{{.Z.Label}}-auth.sh \
+  --cert-name {{.Domain}} -d '{{.Domain}}' -d '*.{{.Domain}}' \
+  --agree-tos -m you@example.com --no-eff-email</pre>
+  </li>
+  <li>
+    <h4>Use it</h4>
+    <p><code>/etc/letsencrypt/live/{{.Domain}}/fullchain.pem</code> and <code>privkey.pem</code>. <code>certbot renew</code> (already scheduled by most packages) reuses the hook automatically.</p>
+  </li>
+</ol>
+{{end}}
+
+{{define "acme-acmesh"}}
+<ol class="steps">
+  <li>
+    <h4>Issue</h4>
+    <pre class="code">export ACMEDNS_BASE_URL='{{.APIBase}}'
+export ACMEDNS_USERNAME='{{.Z.APIUser}}'
+export ACMEDNS_PASSWORD='{{.Z.APIKey}}'
+export ACMEDNS_SUBDOMAIN='{{.Z.Label}}'
+acme.sh --issue --server letsencrypt --dns dns_acmedns \
+  -d '{{.Domain}}' -d '*.{{.Domain}}'</pre>
+    <p class="small muted">acme.sh stores the credentials in <code>~/.acme.sh/account.conf</code>, so its cron job renews without the exports.</p>
+  </li>
+  <li>
+    <h4>Install the files where you need them</h4>
+    <pre class="code">acme.sh --install-cert -d '{{.Domain}}' \
+  --key-file /etc/ssl/private/{{.Domain}}.key \
+  --fullchain-file /etc/ssl/certs/{{.Domain}}.pem \
+  --reloadcmd 'systemctl reload nginx'</pre>
+  </li>
+</ol>
+{{end}}
+
+{{define "acme-traefik"}}
+<ol class="steps">
+  <li>
+    <h4>Account file next to Traefik</h4>
+    <pre class="code">cat &gt; acme-dns.json &lt;&lt;'EOF'
+{{template "acme-account-json" .}}
+EOF
+chmod 600 acme-dns.json</pre>
+  </li>
+  <li>
+    <h4>docker-compose.yml</h4>
+    <pre class="code">services:
+  traefik:
+    image: traefik:v3.7
+    command:
+      - --entrypoints.websecure.address=:443
+      - --providers.docker=true
+      - --certificatesresolvers.privnet.acme.email=you@example.com
+      - --certificatesresolvers.privnet.acme.storage=/data/acme.json
+      - --certificatesresolvers.privnet.acme.dnschallenge.provider=acme-dns
+    environment:
+      ACME_DNS_API_BASE: {{.APIBase}}
+      ACME_DNS_STORAGE_PATH: /data/acme-dns.json
+    ports: ["443:443"]
+    volumes:
+      - ./acme-dns.json:/data/acme-dns.json
+      - ./acme.json:/data/acme.json
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  whoami:
+    image: traefik/whoami
+    labels:
+      traefik.http.routers.whoami.rule: Host(`whoami.{{.Domain}}`)
+      traefik.http.routers.whoami.tls.certresolver: privnet
+      traefik.http.routers.whoami.tls.domains[0].main: {{.Domain}}
+      traefik.http.routers.whoami.tls.domains[0].sans: "*.{{.Domain}}"</pre>
+    <p class="small muted">Run <code>touch acme.json &amp;&amp; chmod 600 acme.json</code> first, and add <code>whoami</code> as a name above pointing to this host's private IP.</p>
+  </li>
+</ol>
+{{end}}
+
+{{define "acme-certmanager"}}
+<p>cert-manager has a built-in <code>acmeDNS</code> solver.</p>
+<pre class="code">cat &gt; acmedns.json &lt;&lt;'EOF'
+{{template "acme-account-json" .}}
+EOF
+kubectl -n cert-manager create secret generic privnet-{{.Z.Label}}-acmedns --from-file=acmedns.json
+
+kubectl apply -f - &lt;&lt;'EOF'
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: privnet-{{.Z.Label}}
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: you@example.com
+    privateKeySecretRef:
+      name: privnet-{{.Z.Label}}-account
+    solvers:
+      - selector:
+          dnsZones: ["{{.Domain}}"]
+        dns01:
+          acmeDNS:
+            host: {{.APIBase}}
+            accountSecretRef:
+              name: privnet-{{.Z.Label}}-acmedns
+              key: acmedns.json
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-{{.Z.Label}}
+  namespace: default
+spec:
+  secretName: wildcard-{{.Z.Label}}-tls
+  issuerRef: {kind: ClusterIssuer, name: privnet-{{.Z.Label}}}
+  dnsNames: ["{{.Domain}}", "*.{{.Domain}}"]
+EOF</pre>
+{{end}}
+
+{{define "acme-caddy"}}
+<p>Caddy needs the <code>caddy-dns/acmedns</code> module.</p>
+<pre class="code">xcaddy build --with github.com/caddy-dns/acmedns</pre>
+<pre class="code">*.{{.Domain}}, {{.Domain}} {
+	tls {
+		dns acmedns {
+			username {{.Z.APIUser}}
+			password {{.Z.APIKey}}
+			subdomain {{.Z.Label}}
+			server_url {{.APIBase}}
+		}
+	}
+
+	@nas host nas.{{.Domain}}
+	handle @nas {
+		reverse_proxy 127.0.0.1:5000
+	}
+}</pre>
+{{end}}
+
+{{define "acme-manual"}}
+<ol class="steps">
+  <li>
+    <h4>Check resolution</h4>
+    <pre class="code">dig +short {{(index .Examples 0).FQDN}}
+dig +short NS {{.Zone}}</pre>
+    <p class="small muted">Expected: <code>{{(index .Examples 0).IP}}</code>, and <code>{{.Nameserver}}.</code></p>
+  </li>
+  <li>
+    <h4>Publish a test challenge value</h4>
+    <pre class="code">curl -s -X POST {{.APIBase}}/update \
+  -H 'X-Api-User: {{.Z.APIUser}}' \
+  -H 'X-Api-Key: {{.Z.APIKey}}' \
+  -d '{"subdomain": "{{.Z.Label}}", "txt": "privnet-test-0123456789abcdefghijklmnopqrst"}'
+
+dig +short TXT _acme-challenge.{{.Domain}} @{{.Nameserver}}</pre>
+    <p class="small muted">The value must be 43 characters, the length ACME uses. The newest 5 values are kept for 24 hours.</p>
+  </li>
+</ol>
+{{end}}

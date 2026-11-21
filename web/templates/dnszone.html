@@ -1,0 +1,110 @@
+{{define "title"}}{{.Page.Z.Label}} · DNS · privnet{{end}}
+{{define "content"}}{{with .Page}}
+<nav class="crumbs"><a href="/dns">DNS</a> / <span>{{.Z.Label}}</span></nav>
+<div class="page-head">
+  <div>
+    <h1><code class="h1-code">{{.Domain}}</code></h1>
+    <p class="muted">{{if .Network}}Namespace of network <a href="/networks/{{.Network.ID}}">{{.Network.Name}}</a>. Device names are published automatically.{{else}}Standalone namespace.{{end}} Wildcard certificate: <code>*.{{.Domain}}</code></p>
+  </div>
+</div>
+
+<div class="cols">
+  <section class="card" id="names">
+    <h2>Names</h2>
+    {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+    {{if .Hosts}}
+    <div class="table-wrap">
+    <table class="mini">
+      <thead><tr><th>Name</th><th>Address</th><th></th></tr></thead>
+      <tbody>
+      {{$z := .Z}}
+      {{range .Hosts}}
+        <tr><td><code>{{.FQDN}}</code></td><td><code>{{.IP}}</code></td>
+          <td class="right">{{if eq .Source "record"}}<form method="post" action="/dns/{{$z.ID}}/records/{{.ID}}/delete"><button class="btn btn-sm btn-ghost">Remove</button></form>{{else}}<span class="muted small">{{.Source}}</span>{{end}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+    </div>
+    {{end}}
+    {{if .CanAdd}}
+    <form method="post" action="/dns/{{.Z.ID}}/records" class="record-form">
+      <div class="suffix-input"><input type="text" name="name" value="{{.FormName}}" placeholder="nas" required autocomplete="off" spellcheck="false"><span>.{{.Domain}}</span></div>
+      <input type="text" name="ip" value="{{.FormIP}}" placeholder="192.168.1.20" required autocomplete="off" spellcheck="false">
+      <button class="btn">Add name</button>
+    </form>
+    {{end}}
+    <h3 class="variant">Works without any records</h3>
+    <table class="mini">
+      <tbody>
+      {{range .Examples}}<tr><td><code>{{.FQDN}}</code></td><td>→ <code>{{.IP}}</code></td><td class="muted small">{{.Name}}</td></tr>{{end}}
+      </tbody>
+    </table>
+    <p class="small muted">Any address in 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 or 127.0.0.0/8 works. Public IPs are never answered. Use the <code>app-…</code> form for multiple apps per IP: it stays one level deep, so the wildcard certificate covers it.</p>
+  </section>
+
+  <section class="card" id="certs">
+    <h2>ACME credentials</h2>
+    <p class="muted small">These are compatible with the <strong>acme-dns</strong> API, which works with lego, Traefik, cert-manager, acme.sh and Caddy. Anyone with these credentials can get certificates for <code>*.{{.Domain}}</code>, so keep them secret.</p>
+    {{if .ShowKey}}<div class="alert alert-ok">New API key created. The old key no longer works, so update your ACME clients.</div>{{end}}
+    <dl class="kv">
+      <dt>API base URL</dt><dd><code>{{.APIBase}}</code></dd>
+      <dt>Username</dt><dd><code class="key">{{.Z.APIUser}}</code></dd>
+      <dt>API key</dt><dd><code class="key">{{.Z.APIKey}}</code></dd>
+      <dt>Subdomain</dt><dd><code>{{.Z.Label}}</code></dd>
+      <dt>Challenge name</dt><dd><code class="key">_acme-challenge.{{.Domain}}</code></dd>
+    </dl>
+    {{if .TXT}}
+      <p class="small muted">Current challenge values (newest first):</p>
+      <ul class="txt-list">{{range .TXT}}<li><code class="key">{{.Value}}</code> <span class="muted small">{{timeAgo .CreatedAt}}</span></li>{{end}}</ul>
+    {{end}}
+    <form method="post" action="/dns/{{.Z.ID}}/rotate" data-confirm="Create a new API key? The current key stops working immediately."><button class="btn btn-sm btn-ghost">Rotate API key</button></form>
+  </section>
+</div>
+
+<section class="card cookbook" id="guide">
+  <div class="section-head">
+    <h2>Get a trusted certificate</h2>
+    <span class="muted small">Every recipe below uses this namespace's real values.</span>
+  </div>
+  <div class="alert alert-info small">
+    <strong>Request the wildcard</strong> <code>*.{{.Domain}}</code> (plus <code>{{.Domain}}</code>).
+    It covers every name above, and only the namespace shows up in the public Certificate Transparency logs, not your hosts or IPs.
+  </div>
+  <div class="tabs" role="tablist">
+    <button role="tab" class="tab" data-tab="lego" aria-selected="true">lego</button>
+    <button role="tab" class="tab" data-tab="certbot">certbot</button>
+    <button role="tab" class="tab" data-tab="acmesh">acme.sh</button>
+    <button role="tab" class="tab" data-tab="traefik">Traefik</button>
+    <button role="tab" class="tab" data-tab="certmanager">cert-manager</button>
+    <button role="tab" class="tab" data-tab="caddy">Caddy</button>
+    <button role="tab" class="tab" data-tab="manual">Test / curl</button>
+  </div>
+  <div class="tab-panel" data-panel="lego">{{template "acme-lego" .}}</div>
+  <div class="tab-panel" data-panel="certbot">{{template "acme-certbot" .}}</div>
+  <div class="tab-panel" data-panel="acmesh">{{template "acme-acmesh" .}}</div>
+  <div class="tab-panel" data-panel="traefik">{{template "acme-traefik" .}}</div>
+  <div class="tab-panel" data-panel="certmanager">{{template "acme-certmanager" .}}</div>
+  <div class="tab-panel" data-panel="caddy">{{template "acme-caddy" .}}</div>
+  <div class="tab-panel" data-panel="manual">{{template "acme-manual" .}}</div>
+</section>
+
+<section class="card">
+  <h2>Good to know</h2>
+  <ul class="notes">
+    <li><strong>DNS rebinding protection:</strong> some home routers and resolvers (FRITZ!Box, pfSense, OPNsense, Pi-hole/dnsmasq with <code>stop-dns-rebind</code>) drop public answers that contain private IPs. If names don't resolve at home, add an exception for <code>{{.Zone}}</code>. With dnsmasq, that's <code>rebind-domain-ok=/{{.Zone}}/</code>.</li>
+    <li><strong>Renewal:</strong> every recipe renews automatically, as long as the same credentials keep working. Rotating the API key means updating your clients.</li>
+    <li><strong>Rate limits:</strong> all namespaces share Let's Encrypt's limit for <code>{{.Zone}}</code>'s registered domain. One wildcard per namespace is the friendly choice, and renewals don't count.</li>
+  </ul>
+</section>
+
+{{if not .Network}}
+<section class="card danger" id="danger">
+  <h2>Delete namespace</h2>
+  <p class="muted">All names stop resolving immediately and the credentials stop working. Certificates you already have stay valid until they expire. To confirm, type <strong>{{.Z.Label}}</strong>.</p>
+  <form method="post" action="/dns/{{.Z.ID}}/delete" class="inline-form">
+    <input type="text" name="confirm" placeholder="{{.Z.Label}}" required autocomplete="off">
+    <button class="btn btn-danger">Delete namespace</button>
+  </form>
+</section>
+{{end}}
+{{end}}{{end}}

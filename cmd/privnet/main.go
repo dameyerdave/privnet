@@ -11,12 +11,14 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/dameyerdave/privnet/internal/cookbook"
+	pdns "github.com/dameyerdave/privnet/internal/dns"
 	"github.com/dameyerdave/privnet/internal/store"
 	"github.com/dameyerdave/privnet/internal/web"
 	"github.com/dameyerdave/privnet/internal/wg"
@@ -93,6 +95,23 @@ func run() error {
 		mgr = k
 	}
 
+	// Optional private-IP DNS service with ACME DNS-01 support.
+	dnsCfg := web.DNSConfig{
+		Zone:              strings.TrimSuffix(strings.ToLower(os.Getenv("DNS_ZONE")), "."),
+		Nameserver:        env("DNS_NAMESERVER", "ns."+os.Getenv("DNS_ZONE")),
+		PublicIP:          os.Getenv("DNS_PUBLIC_IP"),
+		MaxZonesPerUser:   envInt("MAX_DNS_ZONES_PER_USER", 3),
+		MaxRecordsPerZone: envInt("MAX_DNS_RECORDS_PER_ZONE", 64),
+	}
+	var dnsSrv *pdns.Server
+	if dnsCfg.Enabled() {
+		c := pdns.Config{Zone: dnsCfg.Zone, Nameservers: []string{dnsCfg.Nameserver}, Hostmaster: "hostmaster." + dnsCfg.Zone, CAAIssuer: env("DNS_CAA_ISSUER", "letsencrypt.org")}
+		if a, err := netip.ParseAddr(dnsCfg.PublicIP); err == nil {
+			c.NSAddr = a
+		}
+		dnsSrv = pdns.New(c)
+	}
+
 	srv, err := web.New(web.Config{
 		BaseURL: env("BASE_URL", "http://localhost:8080"),
 		Pool:    pool,
@@ -103,12 +122,24 @@ func run() error {
 		SignupCode:         os.Getenv("SIGNUP_CODE"),
 		MaxNetworksPerUser: envInt("MAX_NETWORKS_PER_USER", 3),
 		ShareTTL:           shareTTL,
-	}, st, mgr, webassets.FS)
+		DNS:                dnsCfg,
+	}, st, mgr, dnsSrv, webassets.FS)
 	if err != nil {
 		return err
 	}
+	if err := srv.EnsureNetworkZones(ctx); err != nil {
+		return fmt.Errorf("dns backfill: %w", err)
+	}
 	if err := srv.Sync(ctx); err != nil {
 		return fmt.Errorf("initial sync: %w", err)
+	}
+	if dnsSrv != nil {
+		go func() {
+			if err := dnsSrv.ListenAndServe(ctx, env("DNS_LISTEN", ":5353")); err != nil {
+				slog.Error("dns", "err", err)
+				stop()
+			}
+		}()
 	}
 	slog.Info("wireguard hub ready", "endpoint", endpoint, "public_key", priv.PublicKey().String(), "pool", pool)
 

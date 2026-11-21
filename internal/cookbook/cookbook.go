@@ -78,6 +78,8 @@ type Cookbook struct {
 	HasKey       bool       // false when the user brought their own private key
 	Config       string     // complete wg-quick config
 	HostsSnippet string
+	DNSDomain    string // "<label>.<zone>" when names resolve publicly, else ""
+	GatewayFQDN  string
 	EndpointHost string
 	EndpointPort string
 }
@@ -102,19 +104,29 @@ func IfaceName(networkSlug string) string {
 	return "pn-" + Slugify(networkSlug, 12)
 }
 
-func FQDN(hostname, networkSlug string) string {
-	return fmt.Sprintf("%s.%s.%s", hostname, networkSlug, DomainSuffix)
+// HostDomain is the domain device names live under: the network's public DNS
+// namespace when the DNS service is enabled, otherwise a hosts-file-only name.
+func HostDomain(networkSlug, dnsDomain string) string {
+	if dnsDomain != "" {
+		return dnsDomain
+	}
+	return networkSlug + "." + DomainSuffix
 }
 
-func Build(n *store.Network, devices []*store.Device, d *store.Device, set Settings) *Cookbook {
+func FQDN(hostname, domain string) string { return hostname + "." + domain }
+
+func Build(n *store.Network, devices []*store.Device, d *store.Device, set Settings, dnsDomain string) *Cookbook {
+	domain := HostDomain(n.Slug, dnsDomain)
 	cb := &Cookbook{
-		Network:  n,
-		Plan:     ipam.NewPlan(n.Subnet, n.MaxClients),
-		Device:   d,
-		Settings: set,
-		Iface:    IfaceName(n.Slug),
-		FQDN:     FQDN(d.Hostname, n.Slug),
-		HasKey:   d.PrivateKey != "",
+		DNSDomain:   dnsDomain,
+		GatewayFQDN: FQDN("gateway", domain),
+		Network:     n,
+		Plan:        ipam.NewPlan(n.Subnet, n.MaxClients),
+		Device:      d,
+		Settings:    set,
+		Iface:       IfaceName(n.Slug),
+		FQDN:        FQDN(d.Hostname, domain),
+		HasKey:      d.PrivateKey != "",
 	}
 	cb.ConfFile = cb.Iface + ".conf"
 	if h, p, ok := strings.Cut(set.Endpoint, ":"); ok {
@@ -122,9 +134,9 @@ func Build(n *store.Network, devices []*store.Device, d *store.Device, set Setti
 	}
 	var hosts strings.Builder
 	fmt.Fprintf(&hosts, "# privnet network %q (%s)\n", n.Name, n.Subnet)
-	fmt.Fprintf(&hosts, "%-15s %s\n", cb.Plan.Gateway, FQDN("gateway", n.Slug))
+	fmt.Fprintf(&hosts, "%-15s %s\n", cb.Plan.Gateway, cb.GatewayFQDN)
 	for _, o := range devices {
-		pi := PeerInfo{Name: o.Name, Hostname: o.Hostname, FQDN: FQDN(o.Hostname, n.Slug), IP: o.IP, Platform: o.Platform, Self: o.ID == d.ID}
+		pi := PeerInfo{Name: o.Name, Hostname: o.Hostname, FQDN: FQDN(o.Hostname, domain), IP: o.IP, Platform: o.Platform, Self: o.ID == d.ID}
 		cb.Peers = append(cb.Peers, pi)
 		if !pi.Self {
 			cb.Others = append(cb.Others, pi)
