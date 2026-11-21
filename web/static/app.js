@@ -127,4 +127,14 @@
   // Reload while the server prepares something (e.g. certificate issuance)
   const auto = document.querySelector("[data-autoreload]");
   if (auto) setTimeout(() => location.reload(), (+auto.dataset.autoreload || 5) * 1000);
+
+  // Accordions: open the panel a link points to (#guide, #https, #cert-3, ...)
+  const openFromHash = () => {
+    if (!location.hash) return;
+    let el;
+    try { el = document.querySelector(location.hash); } catch (e) { return; }
+    for (let d = el; d; d = d.parentElement) if (d.tagName === "DETAILS") d.open = true;
+  };
+  openFromHash();
+  window.addEventListener("hashchange", openFromHash);
 })();

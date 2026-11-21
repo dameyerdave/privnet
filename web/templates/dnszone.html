@@ -33,13 +33,15 @@
       <button class="btn">Add name</button>
     </form>
     {{end}}
-    <h3 class="variant">Works without any records</h3>
+    <details class="accordion accordion-inline">
+    <summary><span class="acc-title"><strong>Names that work without any records</strong><span class="muted small">dashed, prefixed, nip.io style, dotted</span></span></summary>
     <table class="mini">
       <tbody>
       {{range .Examples}}<tr><td><code>{{.FQDN}}</code></td><td>→ <code>{{.IP}}</code></td><td class="muted small">{{.Name}}</td></tr>{{end}}
       </tbody>
     </table>
     <p class="small muted">Any address in 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 or 127.0.0.0/8 works. Public IPs are never answered. Use the <code>app-…</code> form for multiple apps per IP: it stays one level deep, so the wildcard certificate covers it.</p>
+    </details>
   </section>
 
   <section class="card" id="certs">
@@ -61,11 +63,10 @@
   </section>
 </div>
 
-<section class="card cookbook" id="guide">
-  <div class="section-head">
-    <h2>Get a trusted certificate</h2>
-    <span class="muted small">Every recipe below uses this namespace's real values.</span>
-  </div>
+<details class="card cookbook accordion" id="guide">
+  <summary>
+    <span class="acc-title"><h2>Get a trusted certificate</h2><span class="muted small">Recipes for lego, certbot, acme.sh, Traefik, cert-manager and Caddy, with this namespace's real values.</span></span>
+  </summary>
   <div class="alert alert-info small">
     <strong>Request the wildcard</strong> <code>*.{{.Domain}}</code> (plus <code>{{.Domain}}</code>).
     It covers every name above, and only the namespace shows up in the public Certificate Transparency logs, not your hosts or IPs.
@@ -86,16 +87,16 @@
   <div class="tab-panel" data-panel="certmanager">{{template "acme-certmanager" .}}</div>
   <div class="tab-panel" data-panel="caddy">{{template "acme-caddy" .}}</div>
   <div class="tab-panel" data-panel="manual">{{template "acme-manual" .}}</div>
-</section>
+</details>
 
-<section class="card">
-  <h2>Good to know</h2>
+<details class="card accordion" id="notes">
+  <summary><span class="acc-title"><h2>Good to know</h2><span class="muted small">DNS rebinding protection, renewal, rate limits</span></span></summary>
   <ul class="notes">
     <li><strong>DNS rebinding protection:</strong> some home routers and resolvers (FRITZ!Box, pfSense, OPNsense, Pi-hole/dnsmasq with <code>stop-dns-rebind</code>) drop public answers that contain private IPs. If names don't resolve at home, add an exception for <code>{{.Zone}}</code>. With dnsmasq, that's <code>rebind-domain-ok=/{{.Zone}}/</code>.</li>
     <li><strong>Renewal:</strong> every recipe renews automatically, as long as the same credentials keep working. Rotating the API key means updating your clients.</li>
     <li><strong>Rate limits:</strong> all namespaces share Let's Encrypt's limit for <code>{{.Zone}}</code>'s registered domain. One wildcard per namespace is the friendly choice, and renewals don't count.</li>
   </ul>
-</section>
+</details>
 
 {{if not .Network}}
 <section class="card danger" id="danger">

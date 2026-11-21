@@ -55,11 +55,10 @@
   </section>
 </div>
 
-<section class="card cookbook" id="guide">
-  <div class="section-head">
-    <h2>Setup guide</h2>
-    <span class="muted small">Every command below uses this device's real values.</span>
-  </div>
+<details class="card cookbook accordion" id="guide" {{if or .IsNew .Join}}open{{end}}>
+  <summary>
+    <span class="acc-title"><h2>Setup guide</h2><span class="muted small">Step-by-step for {{platformLabel $cb.Device.Platform}} and other platforms, with this device's real values.</span></span>
+  </summary>
   <div class="tabs" role="tablist">
     {{range .Platforms}}
       <button role="tab" class="tab" data-tab="{{.Key}}" {{if eq .Key $cb.Device.Platform}}aria-selected="true"{{end}}>{{.Label}}</button>
@@ -70,7 +69,7 @@
   <div class="tab-panel" data-panel="windows">{{template "cookbook-windows" .}}</div>
   <div class="tab-panel" data-panel="ios">{{template "cookbook-ios" .}}</div>
   <div class="tab-panel" data-panel="android">{{template "cookbook-android" .}}</div>
-</section>
+</details>
 
 {{if and (not .Join) .HTTPS.Enabled}}{{with .HTTPS}}{{$h := .}}
 <section class="card" id="https" {{if .Pending}}data-autoreload="4"{{end}}>
@@ -162,8 +161,9 @@ sudo chmod +x /etc/cron.daily/privnet-tls-{{.Name}}</pre>
   {{end}}
 
   {{if .CanAdd}}
+  <details class="accordion accordion-inline" {{if .Error}}open{{end}}>
+  <summary><span class="acc-title"><strong>{{if .Certs}}Add another HTTPS name{{else}}Add an HTTPS name{{end}}</strong><span class="muted small">Proxy on the hub or downloadable certificate</span></span></summary>
   <form method="post" action="/devices/{{$cb.Device.ID}}/certs" class="cert-form">
-    <h3 class="variant">{{if .Certs}}Add another name{{else}}Add an HTTPS name{{end}}</h3>
     <label>Name
       <div class="suffix-input"><input type="text" name="name" value="{{.FormName}}" placeholder="{{$cb.Device.Hostname}}-web" required pattern="[a-z0-9]([a-z0-9\-]{0,38}[a-z0-9])?" autocomplete="off" spellcheck="false"><span>{{.Suffix}}</span></div>
     </label>
@@ -187,6 +187,7 @@ sudo chmod +x /etc/cron.daily/privnet-tls-{{.Name}}</pre>
     <div><button class="btn">Create certificate</button></div>
     <p class="small muted">Certificate names are published in public Certificate Transparency logs. The addresses behind them stay private.</p>
   </form>
+  </details>
   {{else}}
   <p class="small muted">This device has the maximum of {{.Max}} HTTPS names.</p>
   {{end}}
