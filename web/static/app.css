@@ -45,6 +45,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); }
 a { color: var(--accent); text-decoration: none; }
@@ -314,7 +315,7 @@ input:focus-visible, input:focus { outline: 2px solid var(--accent); outline-off
 .flash { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; animation: flash-in .25s ease-out; }
 .flash-close { background: none; border: 0; color: inherit; font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 0 4px; opacity: .7; }
 .flash-close:hover { opacity: 1; }
-@keyframes flash-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes flash-in { from { transform: translateY(-6px); } to { transform: none; } }
 
 /* page heads */
 .page-head h1 { margin-bottom: 6px; }
@@ -421,7 +422,7 @@ p a:not(.btn), li a:not(.btn), small a, .crumbs a, dd a:not(.btn), .alert a, .fo
 p a:not(.btn):hover, li a:not(.btn):hover, .crumbs a:hover, dd a:not(.btn):hover, .footer a:hover { text-decoration-thickness: 2px; }
 /* A11Y-003: minimum 24px targets for small controls */
 .copy-btn { min-height: 28px; min-width: 44px; }
-details.config-details > summary, details.advanced > summary, .err-details > summary { display: inline-flex; align-items: center; min-height: 28px; }
+details.config-details > summary, details.advanced > summary, .err-details > summary { display: list-item; padding: 4px 0; }
 .flash-close { min-width: 28px; min-height: 28px; }
 /* A11Y-004: step titles are h3 */
 ol.steps > li > h3 { font-size: .98rem; margin: 0 0 .5em; }
@@ -443,7 +444,7 @@ details.rename[open] > summary { background: var(--surface-2); }
 .nav-email { color: var(--muted) !important; font-size: .88rem; }
 
 /* UX-007: inline copy buttons */
-.copy-inline { margin-left: 6px; min-height: 26px; padding: 2px 8px; font: 600 .74rem var(--sans); color: var(--accent); background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; vertical-align: middle; opacity: .75; }
+.copy-inline { margin-left: 6px; min-height: 26px; padding: 2px 8px; font: 600 .74rem var(--sans); color: var(--accent); background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; vertical-align: middle; }
 .copy-inline:hover, .copy-inline:focus-visible { opacity: 1; background: var(--surface-2); }
 .copy-inline.copied { color: var(--ok); border-color: var(--ok); opacity: 1; }
 @media (hover: hover) { dd .copy-inline { opacity: 0; } dd:hover .copy-inline, dd .copy-inline:focus-visible, dd .copy-inline.copied { opacity: 1; } }

@@ -284,10 +284,13 @@
   }
 
   // Restore autofocus that browsers skip when the URL has a #fragment (UX-006)
-  if (document.activeElement === document.body) {
+  const restoreAutofocus = () => {
+    if (document.activeElement !== document.body) return;
     const af = $("[autofocus]");
     if (af && af.offsetParent !== null) af.focus({ preventScroll: true });
-  }
+  };
+  restoreAutofocus();
+  window.addEventListener("load", () => setTimeout(restoreAutofocus, 0));
   // Rename popovers: focus and select the name; Escape or a click outside closes
   $$("details.rename").forEach((d) => {
     d.addEventListener("toggle", () => {

@@ -12,7 +12,7 @@
   <p class="muted small">You'll stay signed in here. Every other browser where you're signed in is logged out.</p>
   {{if .PwError}}<div class="alert alert-error" role="alert">{{.PwError}}</div>{{end}}
   <form method="post" action="/account/password" class="stack">
-    <input type="email" name="username" value="{{.Email}}" autocomplete="username" hidden>
+    <input type="email" name="username" value="{{.Email}}" autocomplete="username" aria-label="Email" hidden>
     <label>Current password<span class="pw-field"><input type="password" name="current" required autocomplete="current-password"><button type="button" class="pw-toggle" data-pw-toggle aria-label="Show password">Show</button></span></label>
     <label>New password<span class="pw-field"><input type="password" name="new" minlength="10" maxlength="72" required autocomplete="new-password" aria-describedby="newpw-help"><button type="button" class="pw-toggle" data-pw-toggle aria-label="Show password">Show</button></span>
       <small class="muted" id="newpw-help">10–72 characters. A passphrase of a few words works well.</small></label>

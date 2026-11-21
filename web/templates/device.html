@@ -92,7 +92,7 @@
   <form method="post" action="/devices/{{$cb.Device.ID}}/shares"><button class="btn btn-ghost" data-busy="Creating…">{{if .Shares}}Create another link{{else}}Create share link{{end}}</button></form>
   {{if .Shares}}
     <table class="mini">
-      <thead><tr><th>Created</th><th>Expires</th><th></th></tr></thead>
+      <thead><tr><th>Created</th><th>Expires</th><th><span class="sr-only">Actions</span></th></tr></thead>
       <tbody>
       {{range .Shares}}
         <tr><td>{{date .CreatedAt}}</td><td>in {{until .ExpiresAt}}</td>

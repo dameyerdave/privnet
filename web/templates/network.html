@@ -80,13 +80,13 @@
 
   <section class="card" aria-labelledby="plan-h">
     <h2 id="plan-h">Address plan</h2>
-    <div class="slots" role="list">
-      <div class="slot slot-gw" role="listitem"><code>{{.Plan.Gateway}}</code><span>privnet hub</span></div>
+    <div class="slots">
+      <div class="slot slot-gw"><code>{{.Plan.Gateway}}</code><span>privnet hub</span></div>
       {{range .Slots}}
         {{if .Device}}
-          <a class="slot slot-used" role="listitem" href="/devices/{{.Device.ID}}"><code>{{.IP}}</code><span>{{.Device.Name}}</span></a>
+          <a class="slot slot-used" href="/devices/{{.Device.ID}}"><code>{{.IP}}</code><span>{{.Device.Name}}</span></a>
         {{else}}
-          <div class="slot" role="listitem"><code>{{.IP}}</code><span>free</span></div>
+          <div class="slot"><code>{{.IP}}</code><span>free</span></div>
         {{end}}
       {{end}}
     </div>
