@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -257,5 +258,26 @@ func TestAccountPasswordAndDelete(t *testing.T) {
 	}
 	if nets, _ := a.srv.store.AllNetworks(context.Background()); len(nets) != 0 {
 		t.Fatalf("networks left after account deletion: %d", len(nets))
+	}
+}
+
+func TestAddAnotherDeviceOffer(t *testing.T) {
+	a := newTestApp(t, "http://example.test")
+	c := a.client()
+	a.signup(c, "anna@example.org", "correct horse battery")
+	a.post(c, "/networks", url.Values{"name": {"Home"}, "clients": {"4"}})
+	for i, name := range []string{"one", "two", "three", "four"} {
+		a.post(c, "/networks/1/devices", url.Values{"name": {name}, "platform": {"linux"}})
+		_, page := a.get(c, fmt.Sprintf("/devices/%d?new=1", i+1))
+		offered := strings.Contains(page, "Add another device")
+		if want := i < 3; offered != want {
+			t.Fatalf("device %d: offer=%v want %v", i+1, offered, want)
+		}
+	}
+	if res, _ := a.get(c, "/api/networks/1/status"); res.StatusCode != 200 {
+		t.Fatal("status api")
+	}
+	if res, _ := a.get(a.client(), "/api/networks/1/status"); res.StatusCode != 401 {
+		t.Fatalf("anonymous status api should be 401 (the UI relies on it), got %d", res.StatusCode)
 	}
 }

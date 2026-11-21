@@ -33,7 +33,7 @@
 {{end}}
 
 {{if .CanCreate}}
-<details class="card accordion" id="create" {{if or (not .Networks) .Error}}open{{end}}>
+<details class="card accordion" id="create" data-hash-focus {{if or (not .Networks) .Error}}open{{end}}>
   <summary><span class="acc-title"><h2>Create a network</h2><span class="muted small">Takes about ten seconds</span></span></summary>
   {{if .Error}}<div class="alert alert-error" role="alert">{{.Error}}</div>{{end}}
   <form method="post" action="/networks" class="create-net">

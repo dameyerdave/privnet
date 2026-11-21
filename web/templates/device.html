@@ -7,7 +7,7 @@
   </div>
 {{else}}
   <nav class="crumbs" aria-label="Breadcrumb"><a href="/networks">Networks</a> <span aria-hidden="true">/</span> <a href="/networks/{{$cb.Network.ID}}">{{$cb.Network.Name}}</a> <span aria-hidden="true">/</span> <span aria-current="page">{{$cb.Device.Name}}</span></nav>
-  {{if .IsNew}}<div class="alert alert-ok" role="status">Device created and authorized on the hub. Now connect it: scan the QR code on a phone, or follow the setup guide below.</div>{{end}}
+  {{if .IsNew}}<div class="alert alert-ok new-device" role="status"><span><strong>{{$cb.Device.Name}} is ready.</strong> Now connect it: scan the QR code on a phone, or follow the setup guide below.</span>{{if .CanAddMore}}<a class="btn btn-sm btn-ghost" href="/networks/{{$cb.Network.ID}}#add">+ Add another device</a>{{end}}</div>{{end}}
 {{end}}
 
 <div class="page-head">

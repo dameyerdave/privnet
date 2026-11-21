@@ -49,7 +49,7 @@
 {{end}}
 
 <div class="cols">
-  <section class="card" id="add" aria-labelledby="add-h">
+  <section class="card" id="add" aria-labelledby="add-h" data-hash-focus>
     <h2 id="add-h">{{if .Devices}}Add a device{{else}}Add your first device{{end}}</h2>
     {{if .Error}}<div class="alert alert-error" role="alert">{{.Error}}</div>{{end}}
     {{if .Free}}

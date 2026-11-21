@@ -571,6 +571,7 @@ type devicePage struct {
 	AbsConfigURL string
 	ExpiresAt    time.Time
 	HTTPS        *certSection
+	CanAddMore   bool // the network still has free slots (offered after creating a device)
 }
 
 func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
@@ -606,6 +607,11 @@ func (s *Server) renderDevice(w http.ResponseWriter, r *http.Request, code int, 
 		ShareTTL: humanDuration(s.cfg.ShareTTL), IsNew: r.URL.Query().Get("new") == "1",
 		ConfigURL: fmt.Sprintf("/devices/%d/config", d.ID), QRURL: fmt.Sprintf("/devices/%d/qr.png", d.ID),
 		HTTPS: https,
+	}
+	if p.IsNew {
+		if devs, err := s.store.DevicesByNetwork(r.Context(), n.ID); err == nil {
+			p.CanAddMore = len(devs) < n.MaxClients
+		}
 	}
 	if mutate != nil {
 		mutate(&p)

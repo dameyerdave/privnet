@@ -128,6 +128,11 @@
     let el;
     try { el = $(location.hash); } catch (e) { return; }
     for (let d = el; d; d = d.parentElement) if (d.tagName === "DETAILS") d.open = true;
+    // Links to a form (e.g. "+ Add another device") put the cursor in its first field
+    if (el && el.hasAttribute("data-hash-focus")) {
+      const f = $("input:not([type=hidden]):not([type=radio])", el);
+      if (f) setTimeout(() => f.focus({ preventScroll: true }), 0);
+    }
   };
   openFromHash();
   window.addEventListener("hashchange", openFromHash);
@@ -203,12 +208,29 @@
     upd();
   }
 
+  // Shown once when a background request finds the session has ended
+  let signedOutShown = false;
+  const signedOut = () => {
+    if (signedOutShown) return;
+    signedOutShown = true;
+    const main = $("main");
+    const div = document.createElement("div");
+    div.className = "alert alert-error";
+    div.setAttribute("role", "alert");
+    const next = encodeURIComponent(location.pathname);
+    div.innerHTML = 'You have been signed out, so live status stopped updating. <a href="/login?next=' + next + '">Log in again</a>';
+    main.insertBefore(div, main.firstChild);
+  };
+
   // ---- live status (paused while the tab is hidden) ----
   const poller = (url, every, onData) => {
     let timer = null;
     const tick = () => {
       fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } })
-        .then((r) => (r.ok ? r.json() : null))
+        .then((r) => {
+          if (r.status === 401) { stop(); signedOut(); return null; }
+          return r.ok ? r.json() : null;
+        })
         .then((d) => d && onData(d))
         .catch(() => {});
     };

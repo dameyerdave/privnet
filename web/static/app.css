@@ -448,3 +448,8 @@ details.rename[open] > summary { background: var(--surface-2); }
 .copy-inline:hover, .copy-inline:focus-visible { opacity: 1; background: var(--surface-2); }
 .copy-inline.copied { color: var(--ok); border-color: var(--ok); opacity: 1; }
 @media (hover: hover) { dd .copy-inline { opacity: 0; } dd:hover .copy-inline, dd .copy-inline:focus-visible, dd .copy-inline.copied { opacity: 1; } }
+
+/* UX-010: chain device creation */
+.new-device { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
+.new-device strong { display: inline; }
+.new-device .btn { background: var(--surface); }
