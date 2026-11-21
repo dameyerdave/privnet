@@ -50,7 +50,7 @@ ping -c 3 {{.CB.Plan.Gateway}}</pre>
 {{template "cb-byo-note" .}}
 <ol class="steps">
   <li>
-    <h4>Install WireGuard</h4>
+    <h3>Install WireGuard</h3>
     <p>Works on any recent distribution with kernel 5.6 or newer, including Raspberry Pi OS.</p>
     <pre class="code"># Debian / Ubuntu / Raspberry Pi OS
 sudo apt update &amp;&amp; sudo apt install -y wireguard-tools
@@ -62,7 +62,7 @@ sudo dnf install -y wireguard-tools
 sudo pacman -S --needed wireguard-tools</pre>
   </li>
   <li>
-    <h4>Create <code>/etc/wireguard/{{$cb.ConfFile}}</code></h4>
+    <h3>Create <code>/etc/wireguard/{{$cb.ConfFile}}</code></h3>
     {{if .Join}}
     <p>Download the config directly with this one-time-link command:</p>
     <pre class="code">sudo install -d -m 700 /etc/wireguard
@@ -76,22 +76,22 @@ sudo tee /etc/wireguard/{{$cb.ConfFile}} &gt; /dev/null &lt;&lt;'EOF'
 sudo chmod 600 /etc/wireguard/{{$cb.ConfFile}}</pre>
   </li>
   <li>
-    <h4>Connect, and reconnect at every boot</h4>
+    <h3>Connect, and reconnect at every boot</h3>
     <pre class="code">sudo systemctl enable --now wg-quick@{{$cb.Iface}}</pre>
     <p class="small muted">To connect once without autostart, run <code>sudo wg-quick up {{$cb.Iface}}</code> instead (and <code>sudo wg-quick down {{$cb.Iface}}</code> to disconnect).</p>
   </li>
   <li>
-    <h4>Check the tunnel</h4>
+    <h3>Check the tunnel</h3>
     <pre class="code">sudo wg show {{$cb.Iface}}
 ip addr show {{$cb.Iface}}    # should list inet {{$cb.Device.IP}}/32</pre>
     {{template "cb-expect" .}}
   </li>
   <li>
-    <h4>Reach the other devices</h4>
+    <h3>Reach the other devices</h3>
     {{template "cb-peers-unix" .}}
   </li>
   <li>
-    <h4>{{if $cb.DNSDomain}}Use names instead of IPs{{else}}Optional: use names instead of IPs{{end}}</h4>
+    <h3>{{if $cb.DNSDomain}}Use names instead of IPs{{else}}Optional: use names instead of IPs{{end}}</h3>
     {{if $cb.DNSDomain}}{{template "cb-dns-names" .}}{{else}}
     <pre class="code">sudo tee -a /etc/hosts &gt; /dev/null &lt;&lt;'EOF'
 {{$cb.HostsSnippet}}EOF</pre>
@@ -99,7 +99,7 @@ ip addr show {{$cb.Iface}}    # should list inet {{$cb.Device.IP}}/32</pre>
     {{end}}
   </li>
   <li>
-    <h4>Disconnect or uninstall</h4>
+    <h3>Disconnect or uninstall</h3>
     <pre class="code">sudo systemctl disable --now wg-quick@{{$cb.Iface}}
 sudo rm /etc/wireguard/{{$cb.ConfFile}}</pre>
   </li>
@@ -113,24 +113,24 @@ sudo rm /etc/wireguard/{{$cb.ConfFile}}</pre>
 <h3 class="variant">Option A: WireGuard app (recommended)</h3>
 <ol class="steps">
   <li>
-    <h4>Install the app</h4>
+    <h3>Install the app</h3>
     <p>Install <strong>WireGuard</strong> by WireGuard Development Team from the Mac App Store.</p>
   </li>
   <li>
-    <h4>Get the configuration file</h4>
+    <h3>Get the configuration file</h3>
     <p><a class="btn btn-sm" href="{{.ConfigURL}}" download="{{$cb.ConfFile}}">Download {{$cb.ConfFile}}</a> It's saved to <code>~/Downloads/{{$cb.ConfFile}}</code>.</p>
   </li>
   <li>
-    <h4>Import the tunnel</h4>
+    <h3>Import the tunnel</h3>
     <p>Open WireGuard → <em>Import tunnel(s) from file…</em> → choose <code>{{$cb.ConfFile}}</code> → click <em>Allow</em> when macOS asks to add VPN configurations. The tunnel appears as <strong>{{$cb.Iface}}</strong>.</p>
   </li>
   <li>
-    <h4>Activate</h4>
+    <h3>Activate</h3>
     <p>Select <strong>{{$cb.Iface}}</strong> and click <em>Activate</em>. To connect automatically, open <em>Edit</em> → tick <em>On-Demand: Ethernet / Wi-Fi</em>.</p>
     {{template "cb-expect" .}}
   </li>
   <li>
-    <h4>Reach the other devices (Terminal)</h4>
+    <h3>Reach the other devices (Terminal)</h3>
     {{template "cb-peers-unix" .}}
   </li>
 </ol>
@@ -161,28 +161,28 @@ sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder</pre>
 {{template "cb-byo-note" .}}
 <ol class="steps">
   <li>
-    <h4>Install WireGuard</h4>
+    <h3>Install WireGuard</h3>
     <p>Download the official installer from <code>https://download.wireguard.com/windows-client/wireguard-installer.exe</code>, or in PowerShell:</p>
     <pre class="code">winget install --id WireGuard.WireGuard -e</pre>
   </li>
   <li>
-    <h4>Get the configuration file</h4>
+    <h3>Get the configuration file</h3>
     <p><a class="btn btn-sm" href="{{.ConfigURL}}" download="{{$cb.ConfFile}}">Download {{$cb.ConfFile}}</a> It's saved to <code>%USERPROFILE%\Downloads\{{$cb.ConfFile}}</code>.</p>
   </li>
   <li>
-    <h4>Import and activate</h4>
+    <h3>Import and activate</h3>
     <p>Open WireGuard → <em>Import tunnel(s) from file</em> → choose <code>{{$cb.ConfFile}}</code> → <em>Activate</em>. The tunnel is called <strong>{{$cb.Iface}}</strong>.</p>
     <p class="small muted">Prefer an always-on background service that starts at boot? In an <strong>Administrator</strong> PowerShell:</p>
     <pre class="code">&amp; "C:\Program Files\WireGuard\wireguard.exe" /installtunnelservice "$env:USERPROFILE\Downloads\{{$cb.ConfFile}}"</pre>
     <p class="small muted">Remove it again with <code>&amp; "C:\Program Files\WireGuard\wireguard.exe" /uninstalltunnelservice {{$cb.Iface}}</code></p>
   </li>
   <li>
-    <h4>Let the other devices ping this PC</h4>
+    <h3>Let the other devices ping this PC</h3>
     <p>Windows Firewall blocks incoming ping by default. Allow it from your private network only (Administrator PowerShell):</p>
     <pre class="code">New-NetFirewallRule -DisplayName "privnet {{$cb.Iface}} ping" -Direction Inbound -Protocol ICMPv4 -IcmpType 8 -RemoteAddress {{$cb.Network.Subnet}} -Action Allow</pre>
   </li>
   <li>
-    <h4>Check the tunnel</h4>
+    <h3>Check the tunnel</h3>
     <p>In the WireGuard window, <em>Latest handshake</em> should show a recent time. {{template "cb-expect" .}}</p>
     <pre class="code"># gateway (privnet hub)
 ping -n 3 {{$cb.Plan.Gateway}}
@@ -191,7 +191,7 @@ ping -n 3 {{.IP}}
 {{end}}</pre>
   </li>
   <li>
-    <h4>{{if $cb.DNSDomain}}Names instead of IPs{{else}}Optional: names instead of IPs{{end}}</h4>
+    <h3>{{if $cb.DNSDomain}}Names instead of IPs{{else}}Optional: names instead of IPs{{end}}</h3>
     {{if $cb.DNSDomain}}{{template "cb-dns-names" .}}{{else}}
     <p>In an Administrator PowerShell:</p>
     <pre class="code">Add-Content -Path "$env:SystemRoot\System32\drivers\etc\hosts" -Value @"
@@ -208,11 +208,11 @@ ipconfig /flushdns</pre>
 {{template "cb-byo-note" .}}
 <ol class="steps">
   <li>
-    <h4>Install the app</h4>
+    <h3>Install the app</h3>
     <p>Install <strong>WireGuard</strong> by WireGuard Development Team from the App Store.</p>
   </li>
   <li>
-    <h4>Add the tunnel</h4>
+    <h3>Add the tunnel</h3>
     {{if $cb.HasKey}}
     <p><strong>Scanning from a computer screen:</strong> open WireGuard → <strong>+</strong> → <em>Create from QR code</em> → point the camera at the QR code on this page.</p>
     <p><strong>Viewing this page on the iPhone:</strong> tap <a href="{{.ConfigURL}}" download="{{$cb.ConfFile}}">Download {{$cb.ConfFile}}</a> → Share → <em>WireGuard</em>.</p>
@@ -221,20 +221,20 @@ ipconfig /flushdns</pre>
     {{end}}
   </li>
   <li>
-    <h4>Name it and allow VPN</h4>
+    <h3>Name it and allow VPN</h3>
     <p>When asked for a name, enter <code>{{$cb.Iface}}</code>. Tap <em>Allow</em> to add the VPN configuration and confirm with Face ID or your passcode.</p>
   </li>
   <li>
-    <h4>Switch it on</h4>
+    <h3>Switch it on</h3>
     <p>Toggle <strong>{{$cb.Iface}}</strong> on. Tap the tunnel to see <em>Latest handshake</em>. {{template "cb-expect" .}}</p>
     <p class="small muted">Only traffic to <code>{{$cb.Network.Subnet}}</code> uses the tunnel. Normal browsing keeps your usual connection.</p>
   </li>
   <li>
-    <h4>Stay connected</h4>
+    <h3>Stay connected</h3>
     <p>Tap the tunnel → <em>Edit</em> → <em>On-Demand Activation</em> → enable <em>Cellular</em> and <em>Wi-Fi</em>.</p>
   </li>
   <li>
-    <h4>Test it</h4>
+    <h3>Test it</h3>
     <p>From another device in the network, run <code>ping {{$cb.Device.IP}}</code>. From this iPhone, open a service on a peer, for example <code>http://{{if $cb.Others}}{{(index $cb.Others 0).IP}}{{else}}{{$cb.Plan.Gateway}}{{end}}</code>.</p>
   </li>
 </ol>
@@ -246,11 +246,11 @@ ipconfig /flushdns</pre>
 {{template "cb-byo-note" .}}
 <ol class="steps">
   <li>
-    <h4>Install the app</h4>
+    <h3>Install the app</h3>
     <p>Install <strong>WireGuard</strong> (<code>com.wireguard.android</code>) from Google Play or F-Droid.</p>
   </li>
   <li>
-    <h4>Add the tunnel</h4>
+    <h3>Add the tunnel</h3>
     {{if $cb.HasKey}}
     <p><strong>Scanning from a computer screen:</strong> open WireGuard → <strong>+</strong> → <em>Scan from QR code</em> → point the camera at the QR code on this page.</p>
     <p><strong>Viewing this page on the phone:</strong> tap <a href="{{.ConfigURL}}" download="{{$cb.ConfFile}}">Download {{$cb.ConfFile}}</a>, then in WireGuard tap <strong>+</strong> → <em>Import from file or archive</em> → select <code>{{$cb.ConfFile}}</code> from Downloads.</p>
@@ -259,16 +259,16 @@ ipconfig /flushdns</pre>
     {{end}}
   </li>
   <li>
-    <h4>Name it and connect</h4>
+    <h3>Name it and connect</h3>
     <p>Name the tunnel <code>{{$cb.Iface}}</code>, flip its switch on and accept Android's <em>Connection request</em> dialog.</p>
     {{template "cb-expect" .}}
   </li>
   <li>
-    <h4>Stay connected</h4>
+    <h3>Stay connected</h3>
     <p>Android Settings → <em>Network &amp; internet</em> → <em>VPN</em> → gear next to <em>WireGuard</em> → enable <em>Always-on VPN</em>. Leave “Block connections without VPN” <strong>off</strong>, because privnet only carries traffic for <code>{{$cb.Network.Subnet}}</code>.</p>
   </li>
   <li>
-    <h4>Test it</h4>
+    <h3>Test it</h3>
     <p>From another device in the network, run <code>ping {{$cb.Device.IP}}</code>. Tap the tunnel in the app to watch the transfer counters go up.</p>
   </li>
 </ol>

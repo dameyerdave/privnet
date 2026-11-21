@@ -1,0 +1,33 @@
+{{define "title"}}Account · privnet{{end}}
+{{define "content"}}{{with .Page}}
+<div class="page-head">
+  <div>
+    <h1>Account</h1>
+    <p class="muted page-meta"><span>{{.Email}}</span><span>member since {{.Since}}</span><span>{{.Networks}} network{{if ne .Networks 1}}s{{end}}, {{.Devices}} device{{if ne .Devices 1}}s{{end}}</span></p>
+  </div>
+</div>
+
+<section class="card narrow" aria-labelledby="pw-h">
+  <h2 id="pw-h">Change password</h2>
+  <p class="muted small">You'll stay signed in here. Every other browser where you're signed in is logged out.</p>
+  {{if .PwError}}<div class="alert alert-error" role="alert">{{.PwError}}</div>{{end}}
+  <form method="post" action="/account/password" class="stack">
+    <input type="email" name="username" value="{{.Email}}" autocomplete="username" hidden>
+    <label>Current password<span class="pw-field"><input type="password" name="current" required autocomplete="current-password"><button type="button" class="pw-toggle" data-pw-toggle aria-label="Show password">Show</button></span></label>
+    <label>New password<span class="pw-field"><input type="password" name="new" minlength="10" maxlength="72" required autocomplete="new-password" aria-describedby="newpw-help"><button type="button" class="pw-toggle" data-pw-toggle aria-label="Show password">Show</button></span>
+      <small class="muted" id="newpw-help">10–72 characters. A passphrase of a few words works well.</small></label>
+    <div><button class="btn" data-busy="Saving…">Change password</button></div>
+  </form>
+</section>
+
+<details class="card accordion danger narrow" id="danger" {{if .DeleteError}}open{{end}}>
+  <summary><span class="acc-title"><h2>Danger zone</h2><span class="muted small">Delete your account</span></span></summary>
+  <p>This deletes your account with all {{.Networks}} network{{if ne .Networks 1}}s{{end}}, {{.Devices}} device{{if ne .Devices 1}}s{{end}}, share links, HTTPS names and DNS namespaces. Every device is disconnected immediately. It can't be undone.</p>
+  {{if .DeleteError}}<div class="alert alert-error" role="alert">{{.DeleteError}}</div>{{end}}
+  <form method="post" action="/account/delete" class="stack" data-confirm-match="{{.Email}}">
+    <label>Type your email address to confirm<input type="text" name="confirm" placeholder="{{.Email}}" required autocomplete="off" spellcheck="false"></label>
+    <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+    <div><button class="btn btn-danger" data-busy="Deleting…">Delete my account</button></div>
+  </form>
+</details>
+{{end}}{{end}}

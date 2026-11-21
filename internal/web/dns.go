@@ -559,9 +559,13 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 }
 
 func (s *Server) handleACMEUpdate(w http.ResponseWriter, r *http.Request) {
+	if s.tooManyTokens(w, r) {
+		return
+	}
 	user, key := r.Header.Get("X-Api-User"), r.Header.Get("X-Api-Key")
 	z, err := s.store.DNSZoneByAPIUser(r.Context(), user)
 	if err != nil || subtle.ConstantTimeCompare([]byte(z.APIKey), []byte(key)) != 1 {
+		s.badToken(r)
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "forbidden"})
 		return
 	}

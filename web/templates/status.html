@@ -1,9 +1,12 @@
 {{define "title"}}{{.Page.Title}} · privnet{{end}}
 {{define "content"}}{{with .Page}}
-<div class="auth card center">
-  <p class="eyebrow">{{.Code}}</p>
+<div class="auth card center status-card">
+  <p class="eyebrow">Error {{.Code}}</p>
   <h1>{{.Title}}</h1>
   <p class="muted">{{.Message}}</p>
-  <a class="btn" href="/">Go home</a>
+  <div class="btn-row">
+    {{if $.User}}<a class="btn" href="/networks">Your networks</a>{{else}}<a class="btn" href="/">Go to the home page</a>{{end}}
+    <button type="button" class="btn btn-ghost" data-back hidden>Go back</button>
+  </div>
 </div>
 {{end}}{{end}}

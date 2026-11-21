@@ -9,7 +9,7 @@
     {{if .Error}}<div class="alert alert-error" role="alert">{{.Error}}</div>{{end}}
     <form method="post" action="/signup" class="stack">
       <label>Email<input type="email" name="email" value="{{.Email}}" required autofocus autocomplete="email"></label>
-      <label>Password<span class="pw-field"><input type="password" name="password" minlength="10" required autocomplete="new-password" aria-describedby="pw-help"><button type="button" class="pw-toggle" data-pw-toggle aria-label="Show password">Show</button></span>
+      <label>Password<span class="pw-field"><input type="password" name="password" minlength="10" maxlength="72" required autocomplete="new-password" aria-describedby="pw-help"><button type="button" class="pw-toggle" data-pw-toggle aria-label="Show password">Show</button></span>
         <small class="muted" id="pw-help">At least 10 characters. A passphrase of a few words works well.</small></label>
       {{if .NeedCode}}<label>Invite code<input type="text" name="code" required></label>{{end}}
       <button class="btn btn-block" data-busy="Creating account…">Create account</button>

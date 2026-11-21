@@ -3,7 +3,18 @@
 <nav class="crumbs" aria-label="Breadcrumb"><a href="/networks">Networks</a> <span aria-hidden="true">/</span> <span aria-current="page">{{.Network.Name}}</span></nav>
 <div class="page-head">
   <div>
-    <h1>{{.Network.Name}}</h1>
+    <div class="title-row">
+      <h1>{{.Network.Name}}</h1>
+      <details class="rename">
+        <summary class="btn btn-sm btn-ghost" aria-label="Rename network {{.Network.Name}}">Rename</summary>
+        <form method="post" action="/networks/{{.Network.ID}}/rename" class="rename-form">
+          <label class="sr-only" for="rename-net">New name</label>
+          <input type="text" id="rename-net" name="name" value="{{.Network.Name}}" maxlength="40" required autocomplete="off">
+          <button class="btn btn-sm" data-busy="Saving…">Save</button>
+          <small class="muted">Only the display name changes. Devices keep working.</small>
+        </form>
+      </details>
+    </div>
     <p class="muted page-meta">
       <span class="pill {{if .Online}}pill-ok{{end}}" data-online-pill><span class="dot"></span><span><span data-online-count>{{.Online}}</span> online</span></span>
       <span>{{len .Devices}} of {{.Network.MaxClients}} devices</span>

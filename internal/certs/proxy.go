@@ -20,12 +20,12 @@ import (
 
 // Route maps one HTTPS name on the hub to a device inside a private network.
 type Route struct {
-	Host       string        // lower-case FQDN, e.g. nas.home-ab12.ip.kizy.ch
+	Host       string // lower-case FQDN, e.g. nas.home-ab12.ip.kizy.ch
 	Cert       *tls.Certificate
-	Subnet     netip.Prefix  // only clients of this network may use the route
-	Gateway    netip.Addr    // the hub's address in that network (listen + source address)
+	Subnet     netip.Prefix // only clients of this network may use the route
+	Gateway    netip.Addr   // the hub's address in that network (listen + source address)
 	Backend    netip.AddrPort
-	BackendTLS bool          // speak HTTPS to the device without verifying its certificate
+	BackendTLS bool // speak HTTPS to the device without verifying its certificate
 	proxy      *httputil.ReverseProxy
 }
 

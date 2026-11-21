@@ -12,10 +12,21 @@
 
 <div class="page-head">
   <div>
-    <h1>{{$cb.Device.Name}}</h1>
+    <div class="title-row">
+      <h1>{{$cb.Device.Name}}</h1>
+      {{if not .Join}}<details class="rename">
+        <summary class="btn btn-sm btn-ghost" aria-label="Rename device {{$cb.Device.Name}}">Rename</summary>
+        <form method="post" action="/devices/{{$cb.Device.ID}}/rename" class="rename-form">
+          <label class="sr-only" for="rename-dev">New name</label>
+          <input type="text" id="rename-dev" name="name" value="{{$cb.Device.Name}}" maxlength="40" required autocomplete="off">
+          <button class="btn btn-sm" data-busy="Saving…">Save</button>
+          <small class="muted">Its address, DNS name <code>{{$cb.FQDN}}</code> and config stay the same.</small>
+        </form>
+      </details>{{end}}
+    </div>
     <p class="muted page-meta"><span>{{platformLabel $cb.Device.Platform}}</span><span><code>{{$cb.Device.IP}}</code></span><span>in <strong>{{$cb.Network.Name}}</strong></span></p>
   </div>
-  <span class="pill pill-lg {{if .Status.Online}}pill-ok{{end}}" {{if not .Join}}data-device-status="/api/networks/{{$cb.Network.ID}}/status" data-device-id="{{$cb.Device.ID}}"{{end}} role="status" aria-live="polite">
+  <span class="pill pill-lg {{if .Status.Online}}pill-ok{{end}}" data-device-status="{{if .Join}}/join/{{.JoinToken}}/status{{else}}/api/networks/{{$cb.Network.ID}}/status{{end}}" data-device-id="{{$cb.Device.ID}}" role="status" aria-live="polite">
     <span class="dot"></span><span data-device-state>{{if .Status.Online}}connected · {{timeAgo .Status.LastHandshake}}{{else}}not connected yet{{end}}</span>
   </span>
 </div>
@@ -44,10 +55,10 @@
   <section class="card" aria-labelledby="glance-h">
     <h2 id="glance-h">At a glance</h2>
     <dl class="kv">
-      <dt>Address</dt><dd><code>{{$cb.Device.IP}}</code></dd>
-      <dt>DNS name</dt><dd><code>{{$cb.FQDN}}</code></dd>
+      <dt>Address</dt><dd><code id="v-ip">{{$cb.Device.IP}}</code><button type="button" class="copy-inline" data-copy="#v-ip" aria-label="Copy address">Copy</button></dd>
+      <dt>DNS name</dt><dd><code id="v-fqdn">{{$cb.FQDN}}</code><button type="button" class="copy-inline" data-copy="#v-fqdn" aria-label="Copy DNS name">Copy</button></dd>
       <dt>Network</dt><dd><code>{{$cb.Network.Subnet}}</code> <span class="muted small">via gateway <code>{{$cb.Plan.Gateway}}</code></span></dd>
-      <dt>Hub endpoint</dt><dd><code>{{$cb.Settings.Endpoint}}</code> <span class="muted small">UDP</span></dd>
+      <dt>Hub endpoint</dt><dd><code id="v-ep">{{$cb.Settings.Endpoint}}</code> <span class="muted small">UDP</span><button type="button" class="copy-inline" data-copy="#v-ep" aria-label="Copy hub endpoint">Copy</button></dd>
       {{if .Status.Online}}<dt>Traffic</dt><dd>{{bytes .Status.RxBytes}} received · {{bytes .Status.TxBytes}} sent</dd>{{end}}
     </dl>
     <details class="config-details">

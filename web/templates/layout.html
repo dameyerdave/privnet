@@ -22,7 +22,7 @@
           <a href="/networks" class="nav-link" {{if eq .Section "networks"}}aria-current="page"{{end}}>Networks</a>
           {{if .DNS}}<a href="/dns" class="nav-link" {{if eq .Section "dns"}}aria-current="page"{{end}}>DNS</a>{{end}}
           <span class="nav-sep" aria-hidden="true"></span>
-          <span class="muted nav-email" title="Signed in as {{.User.Email}}">{{.User.Email}}</span>
+          <a href="/account" class="nav-link nav-email" title="Account settings for {{.User.Email}}" {{if eq .Section "account"}}aria-current="page"{{end}}>{{.User.Email}}</a>
           <form method="post" action="/logout"><button class="link">Log out</button></form>
         {{else}}
           <a href="/login" class="nav-link">Log in</a>
@@ -32,7 +32,7 @@
     </div>
   </header>
   <main class="wrap" id="main" tabindex="-1">
-    {{with .Flash}}<div class="alert alert-ok flash" role="status" data-flash><span>{{.}}</span><button type="button" class="flash-close" aria-label="Dismiss" data-dismiss>×</button></div>{{end}}
+    {{with .Flash}}<div class="alert {{if .Error}}alert-error{{else}}alert-ok{{end}} flash" role="{{if .Error}}alert{{else}}status{{end}}" data-flash><span>{{.Text}}</span><button type="button" class="flash-close" aria-label="Dismiss" data-dismiss>×</button></div>{{end}}
     {{block "content" .}}{{end}}
   </main>
   <footer class="footer">

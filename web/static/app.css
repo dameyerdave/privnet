@@ -5,11 +5,11 @@
   --text: #14171c;
   --muted: #5d6673;
   --border: #e2e5ea;
-  --accent: #2f6df6;
+  --accent: #2459d8;
   --accent-ink: #ffffff;
   --accent-soft: #e8efff;
-  --btn-bg: #2f6df6;
-  --ok: #138a4b;
+  --btn-bg: #2459d8;
+  --ok: #0e7340;
   --ok-soft: #e3f5ea;
   --danger: #c4312b;
   --danger-soft: #fdecea;
@@ -30,9 +30,9 @@
     --text: #e8ecf2;
     --muted: #9aa4b2;
     --border: #262d39;
-    --accent: #5b8cff;
+    --accent: #6b98ff;
     --accent-soft: #1b2744;
-    --btn-bg: #3a6ff0;
+    --btn-bg: #3366e6;
     --ok: #38c178;
     --ok-soft: #12291d;
     --danger: #ff6b63;
@@ -413,3 +413,37 @@ details.danger[open] { border-color: color-mix(in srgb, var(--danger) 45%, var(-
 @media (max-width: 900px) { .extras { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 520px) { .extras { grid-template-columns: 1fr; } }
 .feature h2 { margin-bottom: .4em; }
+
+/* A11Y-002: links inside running text are underlined, not only colored */
+p a:not(.btn), li a:not(.btn), small a, .crumbs a, dd a:not(.btn), .alert a, .footer a, .qr-hint a {
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px;
+}
+p a:not(.btn):hover, li a:not(.btn):hover, .crumbs a:hover, dd a:not(.btn):hover, .footer a:hover { text-decoration-thickness: 2px; }
+/* A11Y-003: minimum 24px targets for small controls */
+.copy-btn { min-height: 28px; min-width: 44px; }
+details.config-details > summary, details.advanced > summary, .err-details > summary { display: inline-flex; align-items: center; min-height: 28px; }
+.flash-close { min-width: 28px; min-height: 28px; }
+/* A11Y-004: step titles are h3 */
+ol.steps > li > h3 { font-size: .98rem; margin: 0 0 .5em; }
+
+/* UX-003: inline rename */
+.title-row { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; }
+.title-row h1 { margin-bottom: 6px; }
+details.rename { position: relative; }
+details.rename > summary { list-style: none; }
+details.rename > summary::-webkit-details-marker { display: none; }
+details.rename[open] > summary { background: var(--surface-2); }
+.rename-form { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; width: min(420px, calc(100vw - 32px)); display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(16, 24, 40, .14); }
+.rename-form input { margin-top: 0; }
+.rename-form small { grid-column: 1 / -1; font-weight: 400; }
+@media (max-width: 520px) { .rename-form { left: auto; right: 0; } }
+
+/* UX-004: account page */
+.card.narrow { max-width: 640px; }
+.nav-email { color: var(--muted) !important; font-size: .88rem; }
+
+/* UX-007: inline copy buttons */
+.copy-inline { margin-left: 6px; min-height: 26px; padding: 2px 8px; font: 600 .74rem var(--sans); color: var(--accent); background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; vertical-align: middle; opacity: .75; }
+.copy-inline:hover, .copy-inline:focus-visible { opacity: 1; background: var(--surface-2); }
+.copy-inline.copied { color: var(--ok); border-color: var(--ok); opacity: 1; }
+@media (hover: hover) { dd .copy-inline { opacity: 0; } dd:hover .copy-inline, dd .copy-inline:focus-visible, dd .copy-inline.copied { opacity: 1; } }

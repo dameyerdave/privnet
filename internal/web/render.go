@@ -19,7 +19,7 @@ import (
 	"github.com/dameyerdave/privnet/internal/cookbook"
 )
 
-var pageNames = []string{"home", "login", "signup", "networks", "network", "device", "status", "dns", "dnszone"}
+var pageNames = []string{"home", "login", "signup", "networks", "network", "device", "status", "dns", "dnszone", "account"}
 
 // assetVersion hashes the static files so their URLs change on every deploy
 // that changes them (CDNs such as Cloudflare cache /static for hours).
@@ -70,22 +70,38 @@ type layoutData struct {
 	Title   string
 	Page    any
 	Section string // networks | dns | "" — highlights the current nav item
-	Flash   string // confirmation after a redirect (?done=…)
+	Flash   *flash // confirmation after a redirect (?done=…)
 }
 
 // flashMessages are the confirmations a redirect can request with ?done=<key>.
 // Only known keys are shown, so the URL can't inject text.
-var flashMessages = map[string]string{
-	"net-created":    "Network created. Add your first device to get its setup guide and QR code.",
-	"net-deleted":    "Network deleted. All its devices were disconnected.",
-	"device-removed": "Device removed. Its key no longer works on the hub.",
-	"share-revoked":  "Share link revoked.",
-	"cert-removed":   "HTTPS name removed.",
-	"token-rotated":  "New download token created. Update the URLs on the device.",
-	"zone-created":   "Namespace created. Its names resolve right away.",
-	"zone-deleted":   "Namespace deleted.",
-	"record-added":   "Name added. It resolves within a few seconds.",
-	"record-removed": "Name removed.",
+type flash struct {
+	Text  string
+	Error bool
+}
+
+var flashMessages = map[string]flash{
+	"net-created":      {Text: "Network created. Add your first device to get its setup guide and QR code."},
+	"net-deleted":      {Text: "Network deleted. All its devices were disconnected."},
+	"device-removed":   {Text: "Device removed. Its key no longer works on the hub."},
+	"share-revoked":    {Text: "Share link revoked."},
+	"cert-removed":     {Text: "HTTPS name removed."},
+	"token-rotated":    {Text: "New download token created. Update the URLs on the device."},
+	"zone-created":     {Text: "Namespace created. Its names resolve right away."},
+	"zone-deleted":     {Text: "Namespace deleted."},
+	"record-added":     {Text: "Name added. It resolves within a few seconds."},
+	"record-removed":   {Text: "Name removed."},
+	"password-changed": {Text: "Password changed. You were signed out on all other devices."},
+	"account-deleted":  {Text: "Your account and all its networks were deleted."},
+	"renamed":          {Text: "Name saved. Addresses, DNS names and configs are unchanged."},
+	"rename-invalid":   {Text: "That name can't be used. Names need 1–40 characters and must be unique within the network.", Error: true},
+}
+
+func flashFor(key string) *flash {
+	if f, ok := flashMessages[key]; ok {
+		return &f
+	}
+	return nil
 }
 
 // redirectDone redirects to target and asks the next page to confirm an action.
@@ -107,6 +123,8 @@ func sectionOf(path string) string {
 		return "networks"
 	case strings.HasPrefix(path, "/dns"):
 		return "dns"
+	case strings.HasPrefix(path, "/account"):
+		return "account"
 	}
 	return ""
 }
@@ -121,7 +139,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 		user = u
 	}
 	if err := t.ExecuteTemplate(&buf, "layout", layoutData{DNS: s.cfg.DNS.Enabled(), User: user, Page: data,
-		Section: sectionOf(r.URL.Path), Flash: flashMessages[r.URL.Query().Get("done")]}); err != nil {
+		Section: sectionOf(r.URL.Path), Flash: flashFor(r.URL.Query().Get("done"))}); err != nil {
 		slog.Error("render", "page", name, "err", err)
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return

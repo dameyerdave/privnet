@@ -282,4 +282,28 @@
     }, ms);
     again();
   }
+
+  // Restore autofocus that browsers skip when the URL has a #fragment (UX-006)
+  if (document.activeElement === document.body) {
+    const af = $("[autofocus]");
+    if (af && af.offsetParent !== null) af.focus({ preventScroll: true });
+  }
+  // Rename popovers: focus and select the name; Escape or a click outside closes
+  $$("details.rename").forEach((d) => {
+    d.addEventListener("toggle", () => {
+      if (d.open) { const i = $("input[name=name]", d); i.focus(); i.select(); }
+    });
+    d.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { d.open = false; $("summary", d).focus(); }
+    });
+  });
+  document.addEventListener("click", (e) => {
+    $$("details.rename[open]").forEach((d) => { if (!d.contains(e.target)) d.open = false; });
+  });
+
+  // "Go back" buttons only make sense when there is somewhere to go back to
+  $$("[data-back]").forEach((b) => {
+    if (history.length > 1 && document.referrer) b.hidden = false;
+    b.addEventListener("click", () => history.back());
+  });
 })();

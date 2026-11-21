@@ -48,6 +48,14 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		s.render(w, r, "signup", f)
 	}
+	ip := clientIP(r)
+	if ok, wait := s.limits.signupIP.blocked(ip); ok {
+		f.Error = "Too many sign-up attempts from your network. Please try again in " + waitText(wait) + "."
+		w.WriteHeader(http.StatusTooManyRequests)
+		s.render(w, r, "signup", f)
+		return
+	}
+	s.limits.signupIP.add(ip)
 	switch {
 	case f.Closed:
 		fail("Sign-up is disabled on this instance.")
@@ -60,8 +68,8 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		fail("Please enter a valid email address.")
 		return
 	}
-	if len(pw) < 10 {
-		fail("Use a password with at least 10 characters.")
+	if msg := passwordProblem(pw); msg != "" {
+		fail(msg)
 		return
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
@@ -91,19 +99,34 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	f := authForm{Email: strings.TrimSpace(r.FormValue("email")), Next: r.FormValue("next"), Closed: s.cfg.SignupMode == "closed"}
+	ip, account := clientIP(r), strings.ToLower(f.Email)
+	if ok, wait := s.limits.loginIP.blocked(ip); ok {
+		s.loginLocked(w, r, f, wait)
+		return
+	}
+	if ok, wait := s.limits.loginAccount.blocked(account); ok {
+		s.loginLocked(w, r, f, wait)
+		return
+	}
+	pw := r.FormValue("password")
 	u, err := s.store.UserByEmail(r.Context(), f.Email)
-	if err == nil {
-		err = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(r.FormValue("password")))
+	if err == nil && len(pw) > maxPasswordBytes {
+		err = bcrypt.ErrMismatchedHashAndPassword // can't match: we never accept longer passwords
+	} else if err == nil {
+		err = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(pw))
 	} else {
 		// equalise timing for unknown accounts
 		_ = bcrypt.CompareHashAndPassword([]byte("$2a$10$7EqJtq98hPqEX7fNZaFWoOhi5BWX4Z3ZpBvFnD6eJpA9sO4u5XvJK"), []byte("x"))
 	}
 	if err != nil {
+		s.limits.loginIP.add(ip)
+		s.limits.loginAccount.add(account)
 		f.Error = "Email or password is incorrect."
 		w.WriteHeader(http.StatusUnauthorized)
 		s.render(w, r, "login", f)
 		return
 	}
+	s.limits.loginAccount.reset(account)
 	if err := s.setSession(w, r, u.ID); err != nil {
 		s.serverError(w, r, err)
 		return
@@ -113,6 +136,27 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		next = "/networks"
 	}
 	http.Redirect(w, r, next, http.StatusSeeOther)
+}
+
+// maxPasswordBytes is bcrypt's input limit.
+const maxPasswordBytes = 72
+
+// passwordProblem explains why a new password is not acceptable, or returns "".
+func passwordProblem(pw string) string {
+	switch {
+	case len(pw) < 10:
+		return "Use a password with at least 10 characters."
+	case len(pw) > maxPasswordBytes:
+		return "Use a password with at most 72 characters (fewer if it contains emoji or accented letters)."
+	}
+	return ""
+}
+
+func (s *Server) loginLocked(w http.ResponseWriter, r *http.Request, f authForm, wait time.Duration) {
+	f.Error = "Too many failed attempts. For your security, logging in is paused for " + waitText(wait) + "."
+	w.Header().Set("Retry-After", fmt.Sprint(int(wait.Seconds())+1))
+	w.WriteHeader(http.StatusTooManyRequests)
+	s.render(w, r, "login", f)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -444,6 +488,10 @@ func (s *Server) handleCreateDevice(w http.ResponseWriter, r *http.Request) {
 	for _, d := range devs {
 		taken = append(taken, d.IP)
 		hostnames[d.Hostname] = true
+		if strings.EqualFold(strings.TrimSpace(d.Name), name) {
+			fail(fmt.Sprintf("There's already a device named “%s” in this network. Pick a different name.", d.Name))
+			return
+		}
 	}
 	if cl, err := s.store.CertsByNetwork(ctx, n.ID); err == nil {
 		for _, c := range cl {
@@ -664,6 +712,9 @@ func (s *Server) handleRevokeShare(w http.ResponseWriter, r *http.Request) {
 func (s *Server) shareLookup(r *http.Request) (*store.Share, *store.Device, *store.Network, error) {
 	sh, err := s.store.ShareByToken(r.Context(), r.PathValue("token"))
 	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			s.badToken(r)
+		}
 		return nil, nil, nil, err
 	}
 	d, err := s.store.Device(r.Context(), sh.DeviceID)
@@ -675,6 +726,9 @@ func (s *Server) shareLookup(r *http.Request) (*store.Share, *store.Device, *sto
 }
 
 func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
+	if s.tooManyTokens(w, r) {
+		return
+	}
 	sh, d, n, err := s.shareLookup(r)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -699,6 +753,9 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleJoinConfig(w http.ResponseWriter, r *http.Request) {
+	if s.tooManyTokens(w, r) {
+		return
+	}
 	_, d, n, err := s.shareLookup(r)
 	if err != nil {
 		s.handleLookupErr(w, r, err)
@@ -708,10 +765,87 @@ func (s *Server) handleJoinConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleJoinQR(w http.ResponseWriter, r *http.Request) {
+	if s.tooManyTokens(w, r) {
+		return
+	}
 	_, d, n, err := s.shareLookup(r)
 	if err != nil {
 		s.handleLookupErr(w, r, err)
 		return
 	}
 	s.writeQR(w, r, n, d)
+}
+
+// handleJoinStatus lets the anonymous join page show when the device connects.
+// It reveals only this one device's state and works only while the link is valid.
+func (s *Server) handleJoinStatus(w http.ResponseWriter, r *http.Request) {
+	if s.tooManyTokens(w, r) {
+		return
+	}
+	_, d, _, err := s.shareLookup(r)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	status, _ := s.wg.Status()
+	st := status[d.PublicKey]
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode([]statusRow{{ID: d.ID, Online: st.Online(), LastHandshake: timeAgo(st.LastHandshake)}})
+}
+
+// validDisplayName trims and checks a user-facing name.
+func validDisplayName(v string) (string, bool) {
+	v = strings.TrimSpace(v)
+	return v, v != "" && len([]rune(v)) <= 40
+}
+
+func (s *Server) handleRenameNetwork(w http.ResponseWriter, r *http.Request) {
+	n, err := s.ownedNetwork(r, r.PathValue("id"))
+	if err != nil {
+		s.handleLookupErr(w, r, err)
+		return
+	}
+	name, ok := validDisplayName(r.FormValue("name"))
+	if !ok {
+		redirectDone(w, r, fmt.Sprintf("/networks/%d", n.ID), "rename-invalid")
+		return
+	}
+	if err := s.store.RenameNetwork(r.Context(), n.ID, name); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	redirectDone(w, r, fmt.Sprintf("/networks/%d", n.ID), "renamed")
+}
+
+func (s *Server) handleRenameDevice(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d, n, err := s.ownedDevice(r)
+	if err != nil {
+		s.handleLookupErr(w, r, err)
+		return
+	}
+	target := fmt.Sprintf("/devices/%d", d.ID)
+	name, ok := validDisplayName(r.FormValue("name"))
+	if !ok {
+		redirectDone(w, r, target, "rename-invalid")
+		return
+	}
+	devs, err := s.store.DevicesByNetwork(r.Context(), n.ID)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	for _, o := range devs {
+		if o.ID != d.ID && strings.EqualFold(o.Name, name) {
+			redirectDone(w, r, target, "rename-invalid")
+			return
+		}
+	}
+	if err := s.store.RenameDevice(r.Context(), d.ID, name); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	redirectDone(w, r, target, "renamed")
 }

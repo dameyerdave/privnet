@@ -284,6 +284,25 @@ func (s *Store) DeleteSession(ctx context.Context, token string) error {
 	return err
 }
 
+// SetPassword replaces a user's password hash.
+func (s *Store) SetPassword(ctx context.Context, userID int64, hash string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET password_hash=? WHERE id=?`, hash, userID)
+	return err
+}
+
+// DeleteOtherSessions logs a user out everywhere except the given session.
+func (s *Store) DeleteOtherSessions(ctx context.Context, userID int64, keepToken string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id=? AND token_hash<>?`, userID, HashToken(keepToken))
+	return err
+}
+
+// DeleteUser removes an account and, through ON DELETE CASCADE, its sessions,
+// networks, devices, share links, certificates and DNS namespaces.
+func (s *Store) DeleteUser(ctx context.Context, userID int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id=?`, userID)
+	return err
+}
+
 func (s *Store) PurgeExpired(ctx context.Context) error {
 	now := time.Now().UTC()
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at <= ?`, now); err != nil {
@@ -353,6 +372,13 @@ func (s *Store) NetworksByUser(ctx context.Context, userID int64) ([]*Network, e
 
 func (s *Store) AllNetworks(ctx context.Context) ([]*Network, error) {
 	return s.networks(ctx, `SELECT `+netCols+` FROM networks ORDER BY id`)
+}
+
+// RenameNetwork changes the display name only; the slug (and with it the
+// interface name and DNS namespace) stays, so device configs keep working.
+func (s *Store) RenameNetwork(ctx context.Context, id int64, name string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE networks SET name=? WHERE id=?`, name, id)
+	return err
 }
 
 func (s *Store) DeleteNetwork(ctx context.Context, id int64) error {
@@ -426,6 +452,12 @@ func (s *Store) DevicesByNetwork(ctx context.Context, networkID int64) ([]*Devic
 
 func (s *Store) AllDevices(ctx context.Context) ([]*Device, error) {
 	return s.devices(ctx, `SELECT `+devCols+` FROM devices ORDER BY id`)
+}
+
+// RenameDevice changes the display name only; hostname, IP and keys stay.
+func (s *Store) RenameDevice(ctx context.Context, id int64, name string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE devices SET name=? WHERE id=?`, name, id)
+	return err
 }
 
 func (s *Store) DeleteDevice(ctx context.Context, id int64) error {

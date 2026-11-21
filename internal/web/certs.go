@@ -478,13 +478,17 @@ func (s *Server) handleCertFile(w http.ResponseWriter, r *http.Request) {
 
 // handleCertFetch lets a device pull its renewed files with the secret token URL.
 func (s *Server) handleCertFetch(w http.ResponseWriter, r *http.Request) {
+	if s.tooManyTokens(w, r) {
+		return
+	}
 	tok := r.PathValue("token")
-	if len(tok) < 32 {
+	c, err := s.store.CertByFetchToken(r.Context(), tok)
+	if err != nil || len(tok) < 32 {
+		s.badToken(r)
 		http.NotFound(w, r)
 		return
 	}
-	c, err := s.store.CertByFetchToken(r.Context(), tok)
-	if err != nil || !writeCertFile(w, c, r.PathValue("file")) {
+	if !writeCertFile(w, c, r.PathValue("file")) {
 		http.NotFound(w, r)
 	}
 }

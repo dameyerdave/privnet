@@ -38,17 +38,19 @@ type Config struct {
 }
 
 type Server struct {
-	cfg    Config
-	store  *store.Store
-	wg     wg.Manager
-	dns    *pdns.Server // nil when the DNS service is disabled
+	cfg   Config
+	store *store.Store
+	wg    wg.Manager
+	dns   *pdns.Server // nil when the DNS service is disabled
+
+	limits *limits
 
 	issuer    *certs.Issuer // nil when HTTPS certificates are disabled
 	proxy     *certs.Proxy  // nil when the hub's HTTPS proxy is disabled
 	certQueue chan int64
-	pages  map[string]*template.Template
-	static fs.FS
-	secure bool
+	pages     map[string]*template.Template
+	static    fs.FS
+	secure    bool
 
 	// mu serialises every mutation together with the WireGuard reconcile that
 	// follows it, so IP allocation and kernel state never race.
@@ -58,7 +60,7 @@ type Server struct {
 const sessionCookie = "privnet_session"
 
 func New(cfg Config, st *store.Store, mgr wg.Manager, dnsSrv *pdns.Server, assets fs.FS) (*Server, error) {
-	s := &Server{cfg: cfg, store: st, wg: mgr, dns: dnsSrv, secure: strings.HasPrefix(cfg.BaseURL, "https://")}
+	s := &Server{cfg: cfg, store: st, wg: mgr, dns: dnsSrv, secure: strings.HasPrefix(cfg.BaseURL, "https://"), limits: newLimits()}
 	if err := s.loadTemplates(assets); err != nil {
 		return nil, err
 	}
@@ -108,10 +110,15 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /login", s.handleLogin)
 	mux.HandleFunc("POST /logout", s.handleLogout)
 
+	mux.HandleFunc("GET /account", s.auth(s.handleAccount))
+	mux.HandleFunc("POST /account/password", s.auth(s.handleChangePassword))
+	mux.HandleFunc("POST /account/delete", s.auth(s.handleDeleteAccount))
+
 	mux.HandleFunc("GET /networks", s.auth(s.handleNetworks))
 	mux.HandleFunc("POST /networks", s.auth(s.handleCreateNetwork))
 	mux.HandleFunc("GET /networks/{id}", s.auth(s.handleNetwork))
 	mux.HandleFunc("POST /networks/{id}/delete", s.auth(s.handleDeleteNetwork))
+	mux.HandleFunc("POST /networks/{id}/rename", s.auth(s.handleRenameNetwork))
 	mux.HandleFunc("POST /networks/{id}/devices", s.auth(s.handleCreateDevice))
 	mux.HandleFunc("GET /api/networks/{id}/status", s.auth(s.handleNetworkStatus))
 
@@ -119,6 +126,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /devices/{id}/config", s.auth(s.handleDeviceConfig))
 	mux.HandleFunc("GET /devices/{id}/qr.png", s.auth(s.handleDeviceQR))
 	mux.HandleFunc("POST /devices/{id}/delete", s.auth(s.handleDeleteDevice))
+	mux.HandleFunc("POST /devices/{id}/rename", s.auth(s.handleRenameDevice))
 	mux.HandleFunc("POST /devices/{id}/shares", s.auth(s.handleCreateShare))
 	mux.HandleFunc("POST /devices/{id}/shares/{sid}/revoke", s.auth(s.handleRevokeShare))
 
@@ -144,9 +152,15 @@ func (s *Server) Routes() http.Handler {
 		mux.HandleFunc("GET /acme-dns/health", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 	}
 
+	// Anything else: a friendly 404 inside the normal layout.
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		s.renderStatus(w, r, http.StatusNotFound, "Page not found", "This page doesn't exist. It may have been removed, or the link is incomplete.")
+	})
+
 	mux.HandleFunc("GET /join/{token}", s.handleJoin)
 	mux.HandleFunc("GET /join/{token}/config", s.handleJoinConfig)
 	mux.HandleFunc("GET /join/{token}/qr.png", s.handleJoinQR)
+	mux.HandleFunc("GET /join/{token}/status", s.handleJoinStatus)
 
 	return s.securityHeaders(s.csrf(mux))
 }
@@ -226,6 +240,9 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 		// same-origin keeps share-link tokens from leaking to other sites while
 		// still letting the browser send a real Origin on our own form posts.
 		h.Set("Referrer-Policy", "same-origin")
+		if s.secure {
+			h.Set("Strict-Transport-Security", "max-age=31536000")
+		}
 		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
 	})

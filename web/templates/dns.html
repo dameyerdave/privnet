@@ -42,9 +42,9 @@
 <details class="card accordion" id="how" {{if not .Zones}}open{{end}}>
   <summary><span class="acc-title"><h2>How it works</h2><span class="muted small">Private IPs, public names, trusted certificates</span></span></summary>
   <ol class="steps">
-    <li><h4>Names resolve to private IPs</h4><p><code>192-168-1-10.<em>yourname</em>.{{.Zone}}</code> resolves to <code>192.168.1.10</code> from anywhere, with no setup. You can also add your own names, like <code>nas.<em>yourname</em>.{{.Zone}}</code>. Only private ranges are ever answered.</p></li>
-    <li><h4>Only you can prove ownership</h4><p>Each namespace has its own API credentials. Your ACME client uses them to publish the DNS-01 challenge, so nobody else can get a certificate for your names.</p></li>
-    <li><h4>One wildcard certificate covers everything</h4><p>Request <code>*.<em>yourname</em>.{{.Zone}}</code> once and it covers every IP and device name in the namespace. Ready-made recipes cover lego, certbot, acme.sh, Traefik, cert-manager and Caddy.</p></li>
+    <li><h3>Names resolve to private IPs</h3><p><code>192-168-1-10.<em>yourname</em>.{{.Zone}}</code> resolves to <code>192.168.1.10</code> from anywhere, with no setup. You can also add your own names, like <code>nas.<em>yourname</em>.{{.Zone}}</code>. Only private ranges are ever answered.</p></li>
+    <li><h3>Only you can prove ownership</h3><p>Each namespace has its own API credentials. Your ACME client uses them to publish the DNS-01 challenge, so nobody else can get a certificate for your names.</p></li>
+    <li><h3>One wildcard certificate covers everything</h3><p>Request <code>*.<em>yourname</em>.{{.Zone}}</code> once and it covers every IP and device name in the namespace. Ready-made recipes cover lego, certbot, acme.sh, Traefik, cert-manager and Caddy.</p></li>
   </ol>
 </details>
 {{end}}{{end}}

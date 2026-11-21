@@ -24,7 +24,7 @@
 <p>The simplest option: <a href="https://go-acme.github.io/lego/">lego</a> is a single binary, also available as a Docker image.</p>
 <ol class="steps">
   <li>
-    <h4>Save the account file</h4>
+    <h3>Save the account file</h3>
     <pre class="code">mkdir -p ~/privnet-certs &amp;&amp; cd ~/privnet-certs
 cat &gt; acme-dns.json &lt;&lt;'EOF'
 {{template "acme-account-json" .}}
@@ -32,7 +32,7 @@ EOF
 chmod 600 acme-dns.json</pre>
   </li>
   <li>
-    <h4>Request the certificate</h4>
+    <h3>Request the certificate</h3>
     <pre class="code">docker run --rm -v "$PWD:/data" -w /data \
   -e ACME_DNS_API_BASE={{.APIBase}} \
   -e ACME_DNS_STORAGE_PATH=/data/acme-dns.json \
@@ -41,11 +41,11 @@ chmod 600 acme-dns.json</pre>
     <p class="small muted">Replace <code>YOUR_EMAIL</code> with a real address (Let's Encrypt rejects example domains). <code>--dns.resolvers</code> makes lego check propagation against a public resolver, which avoids timeouts on Docker's built-in DNS. Add <code>--server https://acme-staging-v02.api.letsencrypt.org/directory</code> for a dry run against staging first.</p>
   </li>
   <li>
-    <h4>Use it</h4>
+    <h3>Use it</h3>
     <p>Certificate and key: <code>~/privnet-certs/lego/certificates/_.{{.Domain}}.crt</code> and <code>_.{{.Domain}}.key</code>.</p>
   </li>
   <li>
-    <h4>Renew (cron, daily)</h4>
+    <h3>Renew (cron, daily)</h3>
     <pre class="code">docker run --rm -v "$HOME/privnet-certs:/data" -w /data \
   -e ACME_DNS_API_BASE={{.APIBase}} -e ACME_DNS_STORAGE_PATH=/data/acme-dns.json \
   goacme/lego --accept-tos --email YOUR_EMAIL --path /data/lego \
@@ -58,7 +58,7 @@ chmod 600 acme-dns.json</pre>
 <p>certbot doesn't need a plugin here. A small hook script publishes the challenge through the privnet API.</p>
 <ol class="steps">
   <li>
-    <h4>Install the hook</h4>
+    <h3>Install the hook</h3>
     <pre class="code">sudo tee /etc/letsencrypt/privnet-{{.Z.Label}}-auth.sh &gt; /dev/null &lt;&lt;'EOF'
 #!/bin/sh
 # privnet DNS-01 hook for {{.Domain}}
@@ -72,14 +72,14 @@ EOF
 sudo chmod 700 /etc/letsencrypt/privnet-{{.Z.Label}}-auth.sh</pre>
   </li>
   <li>
-    <h4>Request the certificate</h4>
+    <h3>Request the certificate</h3>
     <pre class="code">sudo certbot certonly --manual --preferred-challenges dns \
   --manual-auth-hook /etc/letsencrypt/privnet-{{.Z.Label}}-auth.sh \
   --cert-name {{.Domain}} -d '{{.Domain}}' -d '*.{{.Domain}}' \
   --agree-tos -m YOUR_EMAIL --no-eff-email</pre>
   </li>
   <li>
-    <h4>Use it</h4>
+    <h3>Use it</h3>
     <p><code>/etc/letsencrypt/live/{{.Domain}}/fullchain.pem</code> and <code>privkey.pem</code>. <code>certbot renew</code> (already scheduled by most packages) reuses the hook automatically.</p>
   </li>
 </ol>
@@ -88,7 +88,7 @@ sudo chmod 700 /etc/letsencrypt/privnet-{{.Z.Label}}-auth.sh</pre>
 {{define "acme-acmesh"}}
 <ol class="steps">
   <li>
-    <h4>Issue</h4>
+    <h3>Issue</h3>
     <pre class="code">export ACMEDNS_BASE_URL='{{.APIBase}}'
 export ACMEDNS_USERNAME='{{.Z.APIUser}}'
 export ACMEDNS_PASSWORD='{{.Z.APIKey}}'
@@ -98,7 +98,7 @@ acme.sh --issue --server letsencrypt --dns dns_acmedns \
     <p class="small muted">acme.sh stores the credentials in <code>~/.acme.sh/account.conf</code>, so its cron job renews without the exports.</p>
   </li>
   <li>
-    <h4>Install the files where you need them</h4>
+    <h3>Install the files where you need them</h3>
     <pre class="code">acme.sh --install-cert -d '{{.Domain}}' \
   --key-file /etc/ssl/private/{{.Domain}}.key \
   --fullchain-file /etc/ssl/certs/{{.Domain}}.pem \
@@ -110,14 +110,14 @@ acme.sh --issue --server letsencrypt --dns dns_acmedns \
 {{define "acme-traefik"}}
 <ol class="steps">
   <li>
-    <h4>Account file next to Traefik</h4>
+    <h3>Account file next to Traefik</h3>
     <pre class="code">cat &gt; acme-dns.json &lt;&lt;'EOF'
 {{template "acme-account-json" .}}
 EOF
 chmod 600 acme-dns.json</pre>
   </li>
   <li>
-    <h4>docker-compose.yml</h4>
+    <h3>docker-compose.yml</h3>
     <pre class="code">services:
   traefik:
     image: traefik:v3.7
@@ -211,13 +211,13 @@ EOF</pre>
 {{define "acme-manual"}}
 <ol class="steps">
   <li>
-    <h4>Check resolution</h4>
+    <h3>Check resolution</h3>
     <pre class="code">dig +short {{(index .Examples 0).FQDN}}
 dig +short NS {{.Zone}}</pre>
     <p class="small muted">Expected: <code>{{(index .Examples 0).IP}}</code>, and <code>{{.Nameserver}}.</code></p>
   </li>
   <li>
-    <h4>Publish a test challenge value</h4>
+    <h3>Publish a test challenge value</h3>
     <pre class="code">curl -s -X POST {{.APIBase}}/update \
   -H 'X-Api-User: {{.Z.APIUser}}' \
   -H 'X-Api-Key: {{.Z.APIKey}}' \
