@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -64,10 +65,16 @@ type Server struct {
 	zone   string // canonical, lower-case FQDN with trailing dot
 	snap   atomic.Pointer[Snapshot]
 	serial atomic.Uint32
+
+	// challenges holds DNS-01 values of certificates privnet issues itself,
+	// keyed by namespace label. They live only in memory for the few seconds
+	// an ACME order needs.
+	chMu       sync.Mutex
+	challenges map[string][]string
 }
 
 func New(cfg Config) *Server {
-	s := &Server{cfg: cfg, zone: mdns.CanonicalName(cfg.Zone)}
+	s := &Server{cfg: cfg, zone: mdns.CanonicalName(cfg.Zone), challenges: map[string][]string{}}
 	s.snap.Store(&Snapshot{Zones: map[string]*Zone{}})
 	s.serial.Store(uint32(time.Now().Unix()))
 	return s
@@ -81,6 +88,41 @@ func (s *Server) Update(sn *Snapshot) {
 		next = cur + 1
 	}
 	s.serial.Store(next)
+}
+
+// AddChallenge publishes an internal ACME TXT value under
+// _acme-challenge.*.<label>.<zone> until RemoveChallenge is called.
+func (s *Server) AddChallenge(label, value string) {
+	s.chMu.Lock()
+	defer s.chMu.Unlock()
+	s.challenges[label] = append(s.challenges[label], value)
+}
+
+// RemoveChallenge withdraws one value added with AddChallenge.
+func (s *Server) RemoveChallenge(label, value string) {
+	s.chMu.Lock()
+	defer s.chMu.Unlock()
+	vals := s.challenges[label]
+	for i, v := range vals {
+		if v == value {
+			vals = append(vals[:i:i], vals[i+1:]...)
+			break
+		}
+	}
+	if len(vals) == 0 {
+		delete(s.challenges, label)
+	} else {
+		s.challenges[label] = vals
+	}
+}
+
+// ChallengeValues returns the TXT values served for a namespace: internal
+// ones first, then those set through the acme-dns API (newest first).
+func (s *Server) ChallengeValues(z *Zone) []string {
+	s.chMu.Lock()
+	out := append([]string(nil), s.challenges[z.Label]...)
+	s.chMu.Unlock()
+	return append(out, z.TXT...)
 }
 
 // Zone returns the configured zone without trailing dot.
@@ -310,7 +352,7 @@ func (s *Server) ServeDNS(w mdns.ResponseWriter, r *mdns.Msg) {
 		}
 	case Challenge:
 		if q.Qtype == mdns.TypeTXT {
-			for _, v := range res.Namespace.TXT {
+			for _, v := range s.ChallengeValues(res.Namespace) {
 				m.Answer = append(m.Answer, &mdns.TXT{Hdr: hdr(mdns.TypeTXT, ttlTXT), Txt: []string{v}})
 			}
 		}

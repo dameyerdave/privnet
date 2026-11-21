@@ -181,6 +181,27 @@ func (s *Server) SyncDNS(ctx context.Context) error {
 			netZone[z.NetworkID] = byID[z.ID]
 		}
 	}
+	if s.certsEnabled() { // HTTPS names: the device itself, or the gateway for the proxy
+		all, err := s.store.AllCerts(ctx)
+		if err != nil {
+			return err
+		}
+		devIP := map[int64]netip.Addr{}
+		for _, d := range devs {
+			devIP[d.ID] = d.IP
+		}
+		for _, c := range all {
+			pz, n := netZone[c.NetworkID], byNet[c.NetworkID]
+			if pz == nil || n == nil {
+				continue
+			}
+			if c.Mode == store.CertProxy {
+				pz.Hosts[c.Name] = ipam.NewPlan(n.Subnet, n.MaxClients).Gateway
+			} else if ip, ok := devIP[c.DeviceID]; ok {
+				pz.Hosts[c.Name] = ip
+			}
+		}
+	}
 	for _, d := range devs { // devices win over custom records
 		if pz := netZone[d.NetworkID]; pz != nil {
 			pz.Hosts[d.Hostname] = d.IP
@@ -351,6 +372,26 @@ func (s *Server) zonePageData(r *http.Request, z *store.DNSZone) (*zonePage, err
 		}
 		for _, d := range devs {
 			p.Hosts = append(p.Hosts, hostRow{Name: d.Hostname, FQDN: d.Hostname + "." + domain, IP: d.IP, Source: "device", ID: d.ID})
+		}
+		if s.certsEnabled() {
+			list, err := s.store.CertsByNetwork(ctx, n.ID)
+			if err != nil {
+				return nil, err
+			}
+			byDev := map[int64]*store.Device{}
+			for _, d := range devs {
+				byDev[d.ID] = d
+			}
+			for _, c := range list {
+				ip, src := gw, "proxy"
+				if c.Mode == store.CertDownload {
+					if d := byDev[c.DeviceID]; d != nil {
+						ip = d.IP
+					}
+					src = "https"
+				}
+				p.Hosts = append(p.Hosts, hostRow{Name: c.Name, FQDN: c.Name + "." + domain, IP: ip, Source: src, ID: c.DeviceID})
+			}
 		}
 		exampleIP = ipam.NewPlan(n.Subnet, n.MaxClients).FirstHost
 	}

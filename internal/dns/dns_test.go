@@ -108,3 +108,23 @@ func TestServeDNS(t *testing.T) {
 		t.Fatalf("expected REFUSED: %v", r)
 	}
 }
+
+func TestInternalChallenges(t *testing.T) {
+	s := New(Config{Zone: "ip.example.ch", Nameservers: []string{"ns.example.ch"}})
+	s.Update(&Snapshot{Zones: map[string]*Zone{"home": {Label: "home", Hosts: map[string]netip.Addr{}, TXT: []string{"api-value"}}}})
+	s.AddChallenge("home", "internal-1")
+	s.AddChallenge("home", "internal-2")
+	res := s.Lookup("_acme-challenge.nas.home.ip.example.ch")
+	if res.Kind != Challenge {
+		t.Fatalf("kind %v", res.Kind)
+	}
+	got := s.ChallengeValues(res.Namespace)
+	if len(got) != 3 || got[0] != "internal-1" || got[2] != "api-value" {
+		t.Fatalf("values %v", got)
+	}
+	s.RemoveChallenge("home", "internal-1")
+	s.RemoveChallenge("home", "internal-2")
+	if got := s.ChallengeValues(res.Namespace); len(got) != 1 {
+		t.Fatalf("after remove %v", got)
+	}
+}

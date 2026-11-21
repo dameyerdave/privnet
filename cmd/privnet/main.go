@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"crypto"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,6 +18,7 @@ import (
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
+	"github.com/dameyerdave/privnet/internal/certs"
 	"github.com/dameyerdave/privnet/internal/cookbook"
 	pdns "github.com/dameyerdave/privnet/internal/dns"
 	"github.com/dameyerdave/privnet/internal/store"
@@ -27,6 +29,14 @@ import (
 
 func env(key, def string) string {
 	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+// envAllowEmpty is like env, but an explicitly empty value (KEY=) means "off".
+func envAllowEmpty(key, def string) string {
+	if v, ok := os.LookupEnv(key); ok {
 		return v
 	}
 	return def
@@ -127,6 +137,40 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	// Optional per-device HTTPS certificates (Let's Encrypt via DNS-01 on our
+	// own zone) and the hub's TLS-terminating proxy inside the tunnels.
+	var proxy *certs.Proxy
+	if dnsSrv != nil && env("CERTS", "on") == "on" {
+		dir := env("ACME_DIRECTORY", "https://acme-v02.api.letsencrypt.org/directory")
+		issuer := &certs.Issuer{Directory: dir, Email: os.Getenv("ACME_EMAIL"), DNS: dnsSrv,
+			AccountKey: func(ctx context.Context) (crypto.Signer, error) { return acmeAccountKey(ctx, st) }}
+		defProxy := ":443"
+		if env("WG_MODE", "kernel") == "fake" {
+			defProxy = ""
+		}
+		proxyAddr := envAllowEmpty("PROXY_LISTEN", defProxy)
+		if proxyAddr != "" {
+			proxy = certs.NewProxy()
+		}
+		renewBefore, err := time.ParseDuration(env("CERT_RENEW_BEFORE", "720h"))
+		if err != nil {
+			return fmt.Errorf("CERT_RENEW_BEFORE: %w", err)
+		}
+		srv.EnableCerts(web.CertsConfig{
+			Enabled: true, MaxPerUser: envInt("MAX_CERTS_PER_USER", 10), MaxPerDevice: envInt("MAX_CERTS_PER_DEVICE", 3),
+			Proxy: proxy != nil, RenewBefore: renewBefore, RetryAfter: 6 * time.Hour,
+			Staging: strings.Contains(dir, "staging"),
+		}, issuer, proxy)
+		go srv.RunCertWorker(ctx)
+		if proxy != nil {
+			go func() {
+				if err := proxy.Serve(ctx, proxyAddr, envAllowEmpty("PROXY_HTTP_LISTEN", ":80")); err != nil {
+					slog.Error("https proxy stopped", "err", err)
+				}
+			}()
+		}
+		slog.Info("https certificates enabled", "acme", dir, "proxy", proxyAddr)
+	}
 	if err := srv.EnsureNetworkZones(ctx); err != nil {
 		return fmt.Errorf("dns backfill: %w", err)
 	}
@@ -141,6 +185,7 @@ func run() error {
 			}
 		}()
 	}
+	srv.RenewCerts(ctx)
 	slog.Info("wireguard hub ready", "endpoint", endpoint, "public_key", priv.PublicKey().String(), "pool", pool)
 
 	// Periodic housekeeping: purge expired sessions/shares and re-assert kernel
@@ -159,6 +204,7 @@ func run() error {
 				if err := srv.Sync(ctx); err != nil {
 					slog.Warn("resync", "err", err)
 				}
+				srv.RenewCerts(ctx)
 			}
 		}
 	}()
@@ -175,6 +221,21 @@ func run() error {
 		return err
 	}
 	return nil
+}
+
+// acmeAccountKey loads the ACME account key, creating it on first use.
+func acmeAccountKey(ctx context.Context, st *store.Store) (crypto.Signer, error) {
+	if v, err := st.SecretSetting(ctx, "acme_account_key"); err == nil {
+		return certs.ParseAccountKey(v)
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return nil, err
+	}
+	k, p, err := certs.NewAccountKey()
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("generated new ACME account key")
+	return k, st.SetSecretSetting(ctx, "acme_account_key", p)
 }
 
 // serverKey loads the hub's WireGuard private key, creating it on first start.

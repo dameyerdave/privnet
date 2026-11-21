@@ -125,6 +125,26 @@ CREATE TABLE IF NOT EXISTS dns_records (
   created_at TIMESTAMP NOT NULL,
   UNIQUE(zone_id, name)
 );
+CREATE TABLE IF NOT EXISTS certs (
+  id INTEGER PRIMARY KEY,
+  device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  network_id INTEGER NOT NULL REFERENCES networks(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  backend_port INTEGER NOT NULL DEFAULT 0,
+  backend_tls INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL,
+  last_error TEXT NOT NULL DEFAULT '',
+  key_enc TEXT NOT NULL DEFAULT '',
+  cert_pem TEXT NOT NULL DEFAULT '',
+  not_after TIMESTAMP,
+  issued_at TIMESTAMP,
+  attempted_at TIMESTAMP,
+  fetch_token_hash TEXT NOT NULL UNIQUE,
+  fetch_token_enc TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  UNIQUE(network_id, name)
+);
 CREATE TABLE IF NOT EXISTS dns_txt (
   id INTEGER PRIMARY KEY,
   zone_id INTEGER NOT NULL REFERENCES dns_zones(id) ON DELETE CASCADE,

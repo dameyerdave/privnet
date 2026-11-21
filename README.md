@@ -95,6 +95,29 @@ privnet is the authoritative nameserver for `DNS_ZONE` (`ip.kizy.ch`). Every nam
 Let's Encrypt limits are per registered domain (`kizy.ch`), and all namespaces share them.
 For heavy use, run the zone on a dedicated domain and add it to the Public Suffix List.
 
+## HTTPS for devices
+
+Each device can optionally get trusted Let's Encrypt certificates for names the user picks:
+`<name>.<network namespace>.ip.kizy.ch`. privnet runs the ACME DNS-01 flow itself, so no ACME client is needed anywhere.
+It answers the challenge from its own authoritative DNS, in memory, for the few seconds an order takes.
+A certificate comes in one of two modes:
+
+| Mode | DNS name points to | TLS ends at | Renewal |
+|---|---|---|---|
+| **HTTPS proxy** (recommended) | the network's gateway (`.1`) | the hub, which forwards to `device-ip:port` over the tunnel (HTTP, or HTTPS without verification) | fully automatic; the key never leaves the hub |
+| **Download** | the device | the device's own web server | privnet renews 30 days before expiry; the device pulls `fullchain.pem` / `privkey.pem` from a secret token URL (cron recipe on the device page) |
+
+The proxy listens on `:443` (and redirects `:80`) inside the pod, so it is reachable only through WireGuard.
+Each network reaches only its own gateway:
+- iptables allows `-s <subnet> -d <gateway> --dport 80,443` per network;
+- the proxy checks on every TLS handshake and request that the client address is in the route's subnet and that it connected to that network's gateway;
+- the `Host` header must match the TLS SNI.
+
+The proxy dials devices from the network's gateway address, so replies route back into the right tunnel.
+
+Limits: `MAX_CERTS_PER_DEVICE` and `MAX_CERTS_PER_USER`. Failed first issuance is not retried automatically, which protects the shared Let's Encrypt rate limits.
+Failed renewals retry every 6 hours while the old certificate keeps working.
+
 ## Configuration
 
 | Variable | Default | Meaning |
@@ -113,6 +136,12 @@ For heavy use, run the zone on a dedicated domain and add it to the Public Suffi
 | `DNS_NAMESERVER` / `DNS_PUBLIC_IP` | – | NS hostname delegated to, and its public IP |
 | `DNS_LISTEN` | `:5353` | DNS listen address (UDP+TCP) |
 | `MAX_DNS_ZONES_PER_USER` / `MAX_DNS_RECORDS_PER_ZONE` | `3` / `64` | Limits |
+| `CERTS` | `on` | Per-device HTTPS certificates (needs `DNS_ZONE`) |
+| `ACME_DIRECTORY` | Let's Encrypt production | ACME CA; use the staging URL for tests |
+| `ACME_EMAIL` | – | Optional ACME account contact |
+| `PROXY_LISTEN` / `PROXY_HTTP_LISTEN` | `:443` / `:80` | Hub HTTPS proxy and redirect listeners (empty = off; off by default with `WG_MODE=fake`) |
+| `MAX_CERTS_PER_DEVICE` / `MAX_CERTS_PER_USER` | `3` / `10` | Limits |
+| `CERT_RENEW_BEFORE` | `720h` | Renew when expiry is closer than this |
 
 The MTU is 1380 because the pod's eth0 has MTU 1450 (Cilium overlay) and WireGuard adds up to 80 bytes.
 

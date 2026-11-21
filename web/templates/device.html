@@ -72,6 +72,127 @@
   <div class="tab-panel" data-panel="android">{{template "cookbook-android" .}}</div>
 </section>
 
+{{if and (not .Join) .HTTPS.Enabled}}{{with .HTTPS}}{{$h := .}}
+<section class="card" id="https" {{if .Pending}}data-autoreload="4"{{end}}>
+  <div class="section-head">
+    <h2>HTTPS</h2>
+    <span class="muted small">Optional: trusted Let's Encrypt certificates for this device.</span>
+  </div>
+  {{if .Staging}}<div class="alert alert-info">This server uses the Let's Encrypt <strong>staging</strong> CA. Browsers won't trust these certificates.</div>{{end}}
+  {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+
+  {{range .Certs}}
+  <div class="cert" id="cert-{{.ID}}">
+    <div class="cert-head">
+      <div>
+        <code class="cert-name">{{.FQDN}}</code>
+        <div class="small muted">{{if eq .Mode "proxy"}}HTTPS proxy on the hub → <code>{{.Target}}</code>{{else}}certificate for the device itself{{end}} · resolves to <code>{{.PointsTo}}</code></div>
+      </div>
+      {{if eq .Status "issued"}}<span class="pill pill-ok"><span class="dot"></span>valid · {{.DaysLeft}} days left</span>
+      {{else if eq .Status "pending"}}<span class="pill"><span class="dot"></span>issuing…</span>
+      {{else}}<span class="pill pill-err"><span class="dot"></span>failed</span>{{end}}
+    </div>
+    {{if .LastError}}<div class="alert alert-error small">{{if eq .Status "issued"}}The last renewal attempt failed (the current certificate keeps working): {{end}}{{.LastError}}</div>{{end}}
+
+    {{if eq .Status "issued"}}
+      {{if eq .Mode "proxy"}}
+        <p>From any device in <strong>this network</strong>, open <a href="{{.URL}}" rel="noopener"><code>{{.URL}}</code></a>.
+        The hub (<code>{{$h.Gateway}}</code>) terminates TLS and forwards every request through the tunnel to <code>{{.Target}}</code>. It renews the certificate on its own, so there's nothing to install.</p>
+        <ul class="notes small">
+          <li>The service on the device must listen on <code>{{$h.DeviceIP}}</code> (or <code>0.0.0.0</code>) port <code>{{.BackendPort}}</code>, and the device's firewall must allow connections from <code>{{$h.Gateway}}</code>.</li>
+          <li>Only clients connected to this network can open it. Plain <code>http://</code> redirects to HTTPS.</li>
+          <li>The original host name is passed on, plus <code>X-Forwarded-For</code> and <code>X-Forwarded-Proto</code>. Some apps need to be told their public URL.</li>
+        </ul>
+      {{else}}
+        <p class="small muted">Issued {{date .IssuedAt}}, expires {{date .NotAfter}}. privnet renews it 30 days before expiry. Pull the new files with the commands below.</p>
+        <div class="btn-row">
+          <a class="btn btn-sm" href="{{.FileBase}}/fullchain.pem" download>fullchain.pem</a>
+          <a class="btn btn-sm btn-ghost" href="{{.FileBase}}/privkey.pem" download>privkey.pem</a>
+          <a class="btn btn-sm btn-ghost" href="{{.FileBase}}/cert.pem" download>cert.pem</a>
+          <a class="btn btn-sm btn-ghost" href="{{.FileBase}}/chain.pem" download>chain.pem</a>
+        </div>
+        <details class="config-details">
+          <summary>Install &amp; renew automatically (Linux / macOS)</summary>
+          <p class="small muted">The URLs below contain a secret token that lets the device download its own certificate and key without logging in. Treat it like a password.</p>
+          <pre class="code">sudo mkdir -p /etc/privnet-tls/{{.Name}} && cd /etc/privnet-tls/{{.Name}}
+sudo curl -fsS -o fullchain.pem {{.FetchBase}}/fullchain.pem
+sudo curl -fsS -o privkey.pem {{.FetchBase}}/privkey.pem
+sudo chmod 600 privkey.pem</pre>
+          <p class="small">Point your web server at the files, for example nginx:</p>
+          <pre class="code">server {
+    listen 443 ssl;
+    server_name {{.FQDN}};
+    ssl_certificate     /etc/privnet-tls/{{.Name}}/fullchain.pem;
+    ssl_certificate_key /etc/privnet-tls/{{.Name}}/privkey.pem;
+    location / { proxy_pass http://127.0.0.1:8080; }
+}</pre>
+          <p class="small">Refresh daily and reload when the certificate has changed (adjust the reload command):</p>
+          <pre class="code">sudo tee /etc/cron.daily/privnet-tls-{{.Name}} &gt;/dev/null &lt;&lt;'EOF'
+#!/bin/sh
+set -e
+cd /etc/privnet-tls/{{.Name}}
+curl -fsS -o fullchain.pem.new {{.FetchBase}}/fullchain.pem
+curl -fsS -o privkey.pem.new {{.FetchBase}}/privkey.pem
+if ! cmp -s fullchain.pem.new fullchain.pem; then
+  chmod 600 privkey.pem.new
+  mv privkey.pem.new privkey.pem
+  mv fullchain.pem.new fullchain.pem
+  systemctl reload nginx
+else
+  rm -f fullchain.pem.new privkey.pem.new
+fi
+EOF
+sudo chmod +x /etc/cron.daily/privnet-tls-{{.Name}}</pre>
+          <form method="post" action="/devices/{{$cb.Device.ID}}/certs/{{.ID}}/token" data-confirm="Create a new download token? The current URLs stop working.">
+            <button class="btn btn-sm btn-ghost">New download token</button>
+          </form>
+        </details>
+      {{end}}
+    {{else if eq .Status "pending"}}
+      <p class="small muted">Requesting the certificate from Let's Encrypt. This usually takes 10–30 seconds, and the page refreshes on its own.</p>
+    {{end}}
+
+    <div class="btn-row">
+      {{if eq .Status "error"}}<form method="post" action="/devices/{{$cb.Device.ID}}/certs/{{.ID}}/retry"><button class="btn btn-sm">Try again</button></form>{{end}}
+      <form method="post" action="/devices/{{$cb.Device.ID}}/certs/{{.ID}}/delete" data-confirm="Remove {{.FQDN}}? The name stops resolving{{if eq .Mode "proxy"}} and the proxy stops serving it{{end}}.">
+        <button class="btn btn-sm btn-ghost">Remove</button>
+      </form>
+    </div>
+  </div>
+  {{end}}
+
+  {{if .CanAdd}}
+  <form method="post" action="/devices/{{$cb.Device.ID}}/certs" class="cert-form">
+    <h3 class="variant">{{if .Certs}}Add another name{{else}}Add an HTTPS name{{end}}</h3>
+    <label>Name
+      <div class="suffix-input"><input type="text" name="name" value="{{.FormName}}" placeholder="{{$cb.Device.Hostname}}-web" required pattern="[a-z0-9]([a-z0-9\-]{0,38}[a-z0-9])?" autocomplete="off" spellcheck="false"><span>{{.Suffix}}</span></div>
+    </label>
+    <fieldset class="mode-choice">
+      <legend>How should HTTPS work?</legend>
+      {{if .Proxy}}
+      <label class="choice"><input type="radio" name="mode" value="proxy" {{if eq .FormMode "proxy"}}checked{{end}} data-mode>
+        <span><strong>HTTPS proxy on the hub</strong> <span class="pill">recommended</span><br>
+        <span class="small muted">The name points to the gateway <code>{{.Gateway}}</code>. The hub terminates HTTPS and forwards to a port on this device. Renewal is fully automatic and nothing is installed on the device.</span></span></label>
+      <div class="proxy-fields" data-proxy-fields>
+        <label>Port on the device
+          <input type="number" name="port" min="1" max="65535" value="{{.FormPort}}" inputmode="numeric">
+        </label>
+        <label class="check"><input type="checkbox" name="backend_tls" value="1" {{if .FormTLS}}checked{{end}}> The service itself speaks HTTPS (self-signed is fine)</label>
+      </div>
+      {{end}}
+      <label class="choice"><input type="radio" name="mode" value="download" {{if eq .FormMode "download"}}checked{{end}} data-mode>
+        <span><strong>Download the certificate</strong><br>
+        <span class="small muted">The name points to this device (<code>{{.DeviceIP}}</code>). You install the certificate and key in your own web server. privnet renews it, and the device pulls the new files with a token URL.</span></span></label>
+    </fieldset>
+    <div><button class="btn">Create certificate</button></div>
+    <p class="small muted">Certificate names are published in public Certificate Transparency logs. The addresses behind them stay private.</p>
+  </form>
+  {{else}}
+  <p class="small muted">This device has the maximum of {{.Max}} HTTPS names.</p>
+  {{end}}
+</section>
+{{end}}{{end}}
+
 {{if not .Join}}
 <section class="card" id="share">
   <h2>Share onboarding</h2>

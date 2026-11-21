@@ -175,6 +175,10 @@ func (k *Kernel) applyFirewall(nets []Network) error {
 	// (e.g. the web UI listening on the pod IP).
 	fmt.Fprintf(&b, "-A INPUT -i %s -p icmp --icmp-type echo-request -j ACCEPT\n", i)
 	fmt.Fprintf(&b, "-A INPUT -i %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT\n", i)
+	// The HTTPS proxy: each network reaches only its own gateway on 80/443.
+	for _, n := range nets {
+		fmt.Fprintf(&b, "-A INPUT -i %s -s %s -d %s/32 -p tcp -m multiport --dports 80,443 -j ACCEPT\n", i, n.Subnet, n.Gateway)
+	}
 	fmt.Fprintf(&b, "-A INPUT -i %s -j DROP\n", i)
 	// Only intra-network traffic is forwarded.
 	for _, n := range nets {

@@ -111,4 +111,20 @@
     };
     setInterval(poll, 5000);
   }
+
+  // HTTPS form: show the proxy fields only in proxy mode
+  const modeRadios = document.querySelectorAll("input[data-mode]");
+  const proxyFields = document.querySelector("[data-proxy-fields]");
+  if (modeRadios.length && proxyFields) {
+    const upd = () => {
+      const sel = document.querySelector("input[data-mode]:checked");
+      proxyFields.hidden = !sel || sel.value !== "proxy";
+    };
+    modeRadios.forEach((r) => r.addEventListener("change", upd));
+    upd();
+  }
+
+  // Reload while the server prepares something (e.g. certificate issuance)
+  const auto = document.querySelector("[data-autoreload]");
+  if (auto) setTimeout(() => location.reload(), (+auto.dataset.autoreload || 5) * 1000);
 })();

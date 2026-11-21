@@ -441,6 +441,11 @@ func (s *Server) handleCreateDevice(w http.ResponseWriter, r *http.Request) {
 		taken = append(taken, d.IP)
 		hostnames[d.Hostname] = true
 	}
+	if cl, err := s.store.CertsByNetwork(ctx, n.ID); err == nil {
+		for _, c := range cl {
+			hostnames[c.Name] = true
+		}
+	}
 	plan := ipam.NewPlan(n.Subnet, n.MaxClients)
 	ip, err := plan.NextFree(taken)
 	if err != nil {
@@ -513,13 +518,16 @@ type devicePage struct {
 	QRURL        string
 	AbsConfigURL string
 	ExpiresAt    time.Time
+	HTTPS        *certSection
 }
 
 func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
-	s.renderDevice(w, r, "")
+	s.renderDevice(w, r, http.StatusOK, nil)
 }
 
-func (s *Server) renderDevice(w http.ResponseWriter, r *http.Request, newShareURL string) {
+// renderDevice renders the device page; mutate may adjust the page data
+// (e.g. a form error) before rendering.
+func (s *Server) renderDevice(w http.ResponseWriter, r *http.Request, code int, mutate func(*devicePage)) {
 	d, n, err := s.ownedDevice(r)
 	if err != nil {
 		s.handleLookupErr(w, r, err)
@@ -536,13 +544,22 @@ func (s *Server) renderDevice(w http.ResponseWriter, r *http.Request, newShareUR
 		return
 	}
 	status, _ := s.wg.Status()
+	https, err := s.certSectionData(r.Context(), n, d)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 	p := devicePage{
 		CB: cb, Platforms: cookbook.Platforms, Status: status[d.PublicKey], Shares: shares,
-		NewShareURL: newShareURL, ShareTTL: humanDuration(s.cfg.ShareTTL), IsNew: r.URL.Query().Get("new") == "1",
+		ShareTTL: humanDuration(s.cfg.ShareTTL), IsNew: r.URL.Query().Get("new") == "1",
 		ConfigURL: fmt.Sprintf("/devices/%d/config", d.ID), QRURL: fmt.Sprintf("/devices/%d/qr.png", d.ID),
+		HTTPS: https,
 	}
-	if newShareURL != "" {
-		p.NewShareQR = qrDataURI(newShareURL)
+	if mutate != nil {
+		mutate(&p)
+	}
+	if code != http.StatusOK {
+		w.WriteHeader(code)
 	}
 	s.render(w, r, "device", p)
 }
@@ -620,7 +637,10 @@ func (s *Server) handleCreateShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// The token is only stored hashed, so this is the one time it can be shown.
-	s.renderDevice(w, r, strings.TrimRight(s.cfg.BaseURL, "/")+"/join/"+tok)
+	shareURL := strings.TrimRight(s.cfg.BaseURL, "/") + "/join/" + tok
+	s.renderDevice(w, r, http.StatusOK, func(p *devicePage) {
+		p.NewShareURL, p.NewShareQR = shareURL, qrDataURI(shareURL)
+	})
 }
 
 func (s *Server) handleRevokeShare(w http.ResponseWriter, r *http.Request) {

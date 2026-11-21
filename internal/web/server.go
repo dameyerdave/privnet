@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dameyerdave/privnet/internal/certs"
 	"github.com/dameyerdave/privnet/internal/cookbook"
 	pdns "github.com/dameyerdave/privnet/internal/dns"
 	"github.com/dameyerdave/privnet/internal/ipam"
@@ -33,6 +34,7 @@ type Config struct {
 	MaxNetworksPerUser int
 	ShareTTL           time.Duration
 	DNS                DNSConfig
+	Certs              CertsConfig
 }
 
 type Server struct {
@@ -40,6 +42,10 @@ type Server struct {
 	store  *store.Store
 	wg     wg.Manager
 	dns    *pdns.Server // nil when the DNS service is disabled
+
+	issuer    *certs.Issuer // nil when HTTPS certificates are disabled
+	proxy     *certs.Proxy  // nil when the hub's HTTPS proxy is disabled
+	certQueue chan int64
 	pages  map[string]*template.Template
 	static fs.FS
 	secure bool
@@ -67,6 +73,9 @@ func New(cfg Config, st *store.Store, mgr wg.Manager, dnsSrv *pdns.Server, asset
 // Sync pushes the complete desired state from the database to WireGuard and DNS.
 func (s *Server) Sync(ctx context.Context) error {
 	if err := s.SyncDNS(ctx); err != nil {
+		return err
+	}
+	if err := s.syncProxy(ctx); err != nil {
 		return err
 	}
 	nets, err := s.store.AllNetworks(ctx)
@@ -112,6 +121,15 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /devices/{id}/delete", s.auth(s.handleDeleteDevice))
 	mux.HandleFunc("POST /devices/{id}/shares", s.auth(s.handleCreateShare))
 	mux.HandleFunc("POST /devices/{id}/shares/{sid}/revoke", s.auth(s.handleRevokeShare))
+
+	if s.certsEnabled() {
+		mux.HandleFunc("POST /devices/{id}/certs", s.auth(s.handleCreateCert))
+		mux.HandleFunc("POST /devices/{id}/certs/{cid}/delete", s.auth(s.handleDeleteCert))
+		mux.HandleFunc("POST /devices/{id}/certs/{cid}/retry", s.auth(s.handleRetryCert))
+		mux.HandleFunc("POST /devices/{id}/certs/{cid}/token", s.auth(s.handleRotateCertToken))
+		mux.HandleFunc("GET /devices/{id}/certs/{cid}/{file}", s.auth(s.handleCertFile))
+		mux.HandleFunc("GET /certs/fetch/{token}/{file}", s.handleCertFetch)
+	}
 
 	if s.cfg.DNS.Enabled() {
 		mux.HandleFunc("GET /dns", s.auth(s.handleDNSList))
