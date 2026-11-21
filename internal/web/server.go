@@ -154,23 +154,31 @@ func (s *Server) auth(h http.HandlerFunc) http.HandlerFunc {
 
 // csrf rejects state-changing requests from foreign origins. Session cookies
 // are SameSite=Lax as a second layer.
+//
+// Modern browsers send Sec-Fetch-Site, which is authoritative. Only when it is
+// missing (older browsers, non-browser clients) do we fall back to Origin.
+// Note that browsers send "Origin: null" for privacy-sensitive contexts, so
+// "null" must not be compared against the host when Sec-Fetch-Site is present.
 func (s *Server) csrf(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" && site != "none" {
-				http.Error(w, "cross-site request rejected", http.StatusForbidden)
-				return
-			}
-			if o := r.Header.Get("Origin"); o != "" {
-				u, err := url.Parse(o)
-				if err != nil || u.Host != r.Host {
-					http.Error(w, "cross-origin request rejected", http.StatusForbidden)
-					return
-				}
-			}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !sameOrigin(r) {
+			http.Error(w, "cross-origin request rejected", http.StatusForbidden)
+			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func sameOrigin(r *http.Request) bool {
+	if site := r.Header.Get("Sec-Fetch-Site"); site != "" {
+		return site == "same-origin" || site == "none"
+	}
+	o := r.Header.Get("Origin")
+	if o == "" {
+		return true // non-browser client (curl, scripts); no ambient browser credentials risk
+	}
+	u, err := url.Parse(o)
+	return err == nil && u.Host == r.Host
 }
 
 func (s *Server) securityHeaders(next http.Handler) http.Handler {
@@ -178,7 +186,9 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
-		h.Set("Referrer-Policy", "no-referrer")
+		// same-origin keeps share-link tokens from leaking to other sites while
+		// still letting the browser send a real Origin on our own form posts.
+		h.Set("Referrer-Policy", "same-origin")
 		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
 	})
