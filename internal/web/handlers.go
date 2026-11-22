@@ -340,6 +340,7 @@ type networkPage struct {
 	Gateway   string
 	DNSZoneID int64
 	DNSDomain string
+	DNSOff    bool // DNS service runs, but this network's namespace was deleted
 	Online    int
 }
 
@@ -356,6 +357,8 @@ func (s *Server) networkPageData(r *http.Request, n *store.Network) (*networkPag
 	if s.cfg.DNS.Enabled() {
 		if z, err := s.store.DNSZoneByNetwork(r.Context(), n.ID); err == nil {
 			p.DNSZoneID, p.DNSDomain = z.ID, domain
+		} else {
+			p.DNSOff = true
 		}
 	}
 	byIP := map[netip.Addr]*deviceRow{}

@@ -95,7 +95,10 @@
       <dt>Gateway</dt><dd><code>{{.Plan.Gateway}}</code> <span class="muted small">{{.Gateway}}</span></dd>
       <dt>Hub endpoint</dt><dd><code>{{.Endpoint}}</code> <span class="muted small">UDP</span></dd>
       <dt>Interface</dt><dd><code>{{.Iface}}</code></dd>
-      {{if .DNSDomain}}<dt>DNS names</dt><dd><code>*.{{.DNSDomain}}</code><br><a class="small" href="/dns/{{.DNSZoneID}}">DNS names &amp; certificates →</a></dd>{{end}}
+      {{if .DNSDomain}}<dt>DNS names</dt><dd><code>*.{{.DNSDomain}}</code><br><a class="small" href="/dns/{{.DNSZoneID}}">DNS names &amp; certificates →</a></dd>
+      {{else if .DNSOff}}<dt>DNS names</dt><dd><span class="muted">Off</span>
+        <form method="post" action="/networks/{{.Network.ID}}/dns" class="inline-form"><button class="btn btn-sm btn-ghost" data-busy="Turning on…">Turn on DNS names</button></form>
+        <span class="muted small">You get a new namespace, so names differ from before.</span></dd>{{end}}
     </dl>
   </section>
 </div>

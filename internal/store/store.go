@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -39,6 +40,7 @@ type Network struct {
 	Subnet     netip.Prefix
 	MaxClients int
 	CreatedAt  time.Time
+	DNSOff     bool // the owner deleted the network's DNS namespace
 }
 
 type Device struct {
@@ -162,6 +164,10 @@ func Open(path, secret string) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1)
 	if _, err := db.Exec(schema); err != nil {
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
+	// Columns added after the first release.
+	if _, err := db.Exec(`ALTER TABLE networks ADD COLUMN dns_off INTEGER NOT NULL DEFAULT 0`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 	k := sha256.Sum256([]byte("privnet-at-rest:" + secret))
@@ -314,12 +320,12 @@ func (s *Store) PurgeExpired(ctx context.Context) error {
 
 // ---- networks ----
 
-const netCols = `id,user_id,name,slug,subnet,max_clients,created_at`
+const netCols = `id,user_id,name,slug,subnet,max_clients,created_at,dns_off`
 
 func scanNetwork(sc interface{ Scan(...any) error }) (*Network, error) {
 	n := &Network{}
 	var subnet string
-	if err := sc.Scan(&n.ID, &n.UserID, &n.Name, &n.Slug, &subnet, &n.MaxClients, &n.CreatedAt); err != nil {
+	if err := sc.Scan(&n.ID, &n.UserID, &n.Name, &n.Slug, &subnet, &n.MaxClients, &n.CreatedAt, &n.DNSOff); err != nil {
 		return nil, err
 	}
 	p, err := netip.ParsePrefix(subnet)
@@ -372,6 +378,12 @@ func (s *Store) NetworksByUser(ctx context.Context, userID int64) ([]*Network, e
 
 func (s *Store) AllNetworks(ctx context.Context) ([]*Network, error) {
 	return s.networks(ctx, `SELECT `+netCols+` FROM networks ORDER BY id`)
+}
+
+// SetNetworkDNSOff records whether the owner switched off DNS names for a network.
+func (s *Store) SetNetworkDNSOff(ctx context.Context, id int64, off bool) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE networks SET dns_off=? WHERE id=?`, off, id)
+	return err
 }
 
 // RenameNetwork changes the display name only; the slug (and with it the

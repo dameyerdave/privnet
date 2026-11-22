@@ -89,6 +89,8 @@ var flashMessages = map[string]flash{
 	"token-rotated":    {Text: "New download token created. Update the URLs on the device."},
 	"zone-created":     {Text: "Namespace created. Its names resolve right away."},
 	"zone-deleted":     {Text: "Namespace deleted."},
+	"dns-off":          {Text: "DNS names are off for this network. Its namespace and HTTPS names were deleted."},
+	"dns-on":           {Text: "DNS names are on again, under a new namespace. Re-download device configs to use the names."},
 	"record-added":     {Text: "Name added. It resolves within a few seconds."},
 	"record-removed":   {Text: "Name removed."},
 	"password-changed": {Text: "Password changed. You were signed out on all other devices."},

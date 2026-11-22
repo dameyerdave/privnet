@@ -145,6 +145,12 @@ func (s *Store) SetCertFetchToken(ctx context.Context, id int64, token string) e
 	return err
 }
 
+// DeleteCertsByNetwork removes every certificate of a network.
+func (s *Store) DeleteCertsByNetwork(ctx context.Context, networkID int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM certs WHERE network_id=?`, networkID)
+	return err
+}
+
 func (s *Store) DeleteCert(ctx context.Context, id, deviceID int64) error {
 	res, err := s.db.ExecContext(ctx, `DELETE FROM certs WHERE id=? AND device_id=?`, id, deviceID)
 	if err != nil {

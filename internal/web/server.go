@@ -147,6 +147,7 @@ func (s *Server) Routes() http.Handler {
 		mux.HandleFunc("POST /dns/{id}/records/{rid}/delete", s.auth(s.handleDeleteDNSRecord))
 		mux.HandleFunc("POST /dns/{id}/rotate", s.auth(s.handleRotateDNSKey))
 		mux.HandleFunc("POST /dns/{id}/delete", s.auth(s.handleDeleteDNSZone))
+		mux.HandleFunc("POST /networks/{id}/dns", s.auth(s.handleEnableNetworkDNS))
 		mux.HandleFunc("POST /acme-dns/update", s.handleACMEUpdate)
 		mux.HandleFunc("POST /acme-dns/register", s.handleACMERegister)
 		mux.HandleFunc("GET /acme-dns/health", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })

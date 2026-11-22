@@ -98,15 +98,14 @@
   </ul>
 </details>
 
-{{if not .Network}}
 <details class="card accordion danger" id="danger">
   <summary><span class="acc-title"><h2>Danger zone</h2><span class="muted small">Delete this namespace</span></span></summary>
-  <p>All names stop resolving immediately and the credentials stop working. Certificates you already have stay valid until they expire. To confirm, type <strong>{{.Z.Label}}</strong>.</p>
+  {{if .Network}}<p>This turns off DNS names for <strong>{{.Network.Name}}</strong>. All names stop resolving immediately, the credentials stop working, and the network's HTTPS names and proxy routes are deleted. Devices keep their addresses and stay connected. You can turn DNS names back on from the network page, but you get a new namespace. To confirm, type <strong>{{.Z.Label}}</strong>.</p>
+  {{else}}<p>All names stop resolving immediately and the credentials stop working. Certificates you already have stay valid until they expire. To confirm, type <strong>{{.Z.Label}}</strong>.</p>{{end}}
   <form method="post" action="/dns/{{.Z.ID}}/delete" class="inline-form" data-confirm-match="{{.Z.Label}}">
     <label class="sr-only" for="confirm-zone">Namespace</label>
     <input type="text" id="confirm-zone" name="confirm" placeholder="{{.Z.Label}}" required autocomplete="off" spellcheck="false">
     <button class="btn btn-danger" data-busy="Deleting…">Delete namespace</button>
   </form>
 </details>
-{{end}}
 {{end}}{{end}}

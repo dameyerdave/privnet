@@ -26,18 +26,22 @@ type testApp struct {
 	srv *Server
 }
 
-func newTestApp(t *testing.T, baseURL string) *testApp {
+func newTestApp(t *testing.T, baseURL string, opts ...func(*Config)) *testApp {
 	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"), "test-secret-0123456789")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	srv, err := New(Config{
+	cfg := Config{
 		BaseURL: baseURL, Pool: netip.MustParsePrefix("10.77.0.0/16"),
 		Settings:   cookbook.Settings{Endpoint: "203.0.113.1:51820", ServerPublicKey: "x", MTU: 1380, Keepalive: 25},
 		SignupMode: "open", MaxNetworksPerUser: 3, ShareTTL: time.Hour,
-	}, st, &wg.Fake{}, nil, webassets.FS)
+	}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	srv, err := New(cfg, st, &wg.Fake{}, nil, webassets.FS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,5 +283,65 @@ func TestAddAnotherDeviceOffer(t *testing.T) {
 	}
 	if res, _ := a.get(a.client(), "/api/networks/1/status"); res.StatusCode != 401 {
 		t.Fatalf("anonymous status api should be 401 (the UI relies on it), got %d", res.StatusCode)
+	}
+}
+
+func TestDeleteNetworkNamespace(t *testing.T) {
+	a := newTestApp(t, "http://example.test", func(c *Config) {
+		c.DNS = DNSConfig{Zone: "ip.example.test", Nameserver: "ns.example.test", MaxZonesPerUser: 3, MaxRecordsPerZone: 10}
+	})
+	c := a.client()
+	a.signup(c, "anna@example.org", "correct horse battery")
+	a.post(c, "/networks", url.Values{"name": {"Home"}, "clients": {"5"}})
+	a.post(c, "/networks/1/devices", url.Values{"name": {"laptop"}, "platform": {"linux"}})
+	ctx := context.Background()
+	z, err := a.srv.store.DNSZoneByNetwork(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, page := a.get(c, fmt.Sprintf("/dns/%d", z.ID))
+	if !strings.Contains(page, "Delete namespace") {
+		t.Fatal("network namespace page should offer deletion")
+	}
+
+	// Another user can't delete it, and a wrong confirmation keeps it.
+	other := a.client()
+	a.signup(other, "eve@example.org", "eve password 123")
+	if res, _ := a.post(other, fmt.Sprintf("/dns/%d/delete", z.ID), url.Values{"confirm": {z.Label}}); res.StatusCode != 404 {
+		t.Fatalf("other user: %d", res.StatusCode)
+	}
+	a.post(c, fmt.Sprintf("/dns/%d/delete", z.ID), url.Values{"confirm": {"nope"}})
+	if _, err := a.srv.store.DNSZoneByNetwork(ctx, 1); err != nil {
+		t.Fatal("wrong confirmation deleted the namespace")
+	}
+
+	res, _ := a.post(c, fmt.Sprintf("/dns/%d/delete", z.ID), url.Values{"confirm": {z.Label}})
+	if loc := res.Header.Get("Location"); !strings.Contains(loc, "/networks/1") || !strings.Contains(loc, "done=dns-off") {
+		t.Fatalf("delete redirect: %q", loc)
+	}
+	if _, err := a.srv.store.DNSZoneByNetwork(ctx, 1); err != store.ErrNotFound {
+		t.Fatalf("namespace still there: %v", err)
+	}
+	// Startup backfill must not bring it back.
+	if err := a.srv.EnsureNetworkZones(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.srv.store.DNSZoneByNetwork(ctx, 1); err != store.ErrNotFound {
+		t.Fatal("backfill recreated a deleted namespace")
+	}
+	if res, page := a.get(c, "/networks/1"); res.StatusCode != 200 || !strings.Contains(page, "Turn on DNS names") {
+		t.Fatalf("network page without DNS: %d", res.StatusCode)
+	}
+	if res, page := a.get(c, "/devices/1"); res.StatusCode != 200 || strings.Contains(page, "Add an HTTPS name") {
+		t.Fatalf("device page without DNS: %d", res.StatusCode)
+	}
+
+	res, _ = a.post(c, "/networks/1/dns", nil)
+	if !strings.Contains(res.Header.Get("Location"), "done=dns-on") {
+		t.Fatalf("enable redirect: %v", res.Header)
+	}
+	z2, err := a.srv.store.DNSZoneByNetwork(ctx, 1)
+	if err != nil || z2.Label == z.Label {
+		t.Fatalf("expected a fresh namespace, got %v %v", z2, err)
 	}
 }

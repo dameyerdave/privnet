@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -208,7 +209,10 @@ func (s *Server) certSectionData(ctx context.Context, n *store.Network, d *store
 		return cs, nil
 	}
 	z, err := s.store.DNSZoneByNetwork(ctx, n.ID)
-	if err != nil {
+	if errors.Is(err, store.ErrNotFound) {
+		cs.Enabled = false // DNS names are off for this network
+		return cs, nil
+	} else if err != nil {
 		return nil, err
 	}
 	plan := ipam.NewPlan(n.Subnet, n.MaxClients)
@@ -322,6 +326,10 @@ func (s *Server) handleCreateCert(w http.ResponseWriter, r *http.Request) {
 			fail("Enter the port the service listens on, on the device (1–65535).")
 			return
 		}
+	}
+	if n.DNSOff {
+		fail("DNS names are off for this network. Turn them on on the network page first.")
+		return
 	}
 	if taken, err := s.zoneNameTaken(ctx, n, name); err != nil {
 		s.serverError(w, r, err)

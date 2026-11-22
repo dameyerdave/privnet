@@ -112,6 +112,9 @@ func (s *Server) EnsureNetworkZones(ctx context.Context) error {
 		return err
 	}
 	for _, n := range nets {
+		if n.DNSOff {
+			continue
+		}
 		if _, err := s.ensureNetworkZone(ctx, n); err != nil {
 			return err
 		}
@@ -527,23 +530,62 @@ func (s *Server) handleDeleteDNSZone(w http.ResponseWriter, r *http.Request) {
 		s.handleLookupErr(w, r, err)
 		return
 	}
-	if z.NetworkID != 0 {
-		http.Error(w, "network namespaces are removed together with their network", http.StatusBadRequest)
-		return
-	}
 	if r.FormValue("confirm") != z.Label {
 		http.Redirect(w, r, fmt.Sprintf("/dns/%d#danger", z.ID), http.StatusSeeOther)
 		return
 	}
-	if err := s.store.DeleteDNSZone(r.Context(), z.ID); err != nil {
+	ctx := r.Context()
+	if z.NetworkID != 0 {
+		// A network's namespace carries its HTTPS names, so they go too, and
+		// the namespace isn't recreated until the owner turns DNS back on.
+		if err := s.store.DeleteCertsByNetwork(ctx, z.NetworkID); err != nil {
+			s.serverError(w, r, err)
+			return
+		}
+		if err := s.store.SetNetworkDNSOff(ctx, z.NetworkID, true); err != nil {
+			s.serverError(w, r, err)
+			return
+		}
+	}
+	if err := s.store.DeleteDNSZone(ctx, z.ID); err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	if err := s.SyncDNS(r.Context()); err != nil {
+	if err := s.Sync(ctx); err != nil {
 		s.serverError(w, r, err)
+		return
+	}
+	if z.NetworkID != 0 {
+		redirectDone(w, r, fmt.Sprintf("/networks/%d", z.NetworkID), "dns-off")
 		return
 	}
 	redirectDone(w, r, "/dns", "zone-deleted")
+}
+
+// handleEnableNetworkDNS gives a network a fresh namespace after its old one was deleted.
+func (s *Server) handleEnableNetworkDNS(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n, err := s.ownedNetwork(r, r.PathValue("id"))
+	if err != nil {
+		s.handleLookupErr(w, r, err)
+		return
+	}
+	ctx := r.Context()
+	if err := s.store.SetNetworkDNSOff(ctx, n.ID, false); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	n.DNSOff = false
+	if _, err := s.ensureNetworkZone(ctx, n); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	if err := s.Sync(ctx); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	redirectDone(w, r, fmt.Sprintf("/networks/%d", n.ID), "dns-on")
 }
 
 // ---- acme-dns compatible API ----
